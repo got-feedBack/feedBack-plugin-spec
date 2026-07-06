@@ -58,6 +58,15 @@ for how the document, manifest, and per-plugin versions relate.
   first discovered wins), **reserved ids** (`capability_inspector`, `app_tour_*` are always-enabled),
   and namespacing shared-space names (`localStorage`, `window` globals, routes, CSS) by `id`. Added
   matching checklist items. Docs only.
+- Best-practices guide: added a **"Minigames"** section for plugins that register into the bundled
+  `minigames` host, ground-truthed against the host + SDK. Covers **late-binding registration** (the
+  host loads after your plugin — queue via `window.__feedBackMinigamesPending` and/or the
+  `feedBack-minigames-ready` event), the `minigame` manifest block with `spec.id` === plugin `id`,
+  the `start`/`stop` lifecycle where **the game must release everything it opens** (rAF loops,
+  `AudioContext`, `getUserMedia`, timers, listeners — the host only cancels its own), supersede-safe
+  `start` (double-tap / navigate-away races), standalone-by-default vs `usesPlayer`, and host-owned
+  scoring/persistence (report via the SDK; single active session). Added a Minigames checklist block.
+  Docs only.
 
 ## [0.1.0] - 2026-07-05
 

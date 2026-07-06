@@ -321,9 +321,83 @@ than tripping the auto-revert and dropping the user back to the default visualiz
 
 ---
 
+## Minigames
+
+A **minigame** is a plugin that registers a small, self-contained game into the bundled
+`minigames` **host** — a hub + SDK that lists every registered game, runs one at a time, and owns
+scoring and progression. You don't build a standalone game screen; you ship a normal plugin that
+hands the host a *spec*, and the host mounts, runs, tears down, and scores it. As with the
+visualization contract, the names below (`window.feedBackMinigames`, the `minigame` manifest block,
+`spec.start`/`spec.stop`) are the **current Host contract** — treat the principles as stable and the
+exact API as Host-versioned.
+
+### 21. Register into the host — and bind late
+
+The host loads **after** your plugin (plugins load alphabetically), so `window.feedBackMinigames`
+usually does **not** exist yet when your `script` runs. Never assume it's there. Register through
+the host's pending queue, which the host drains on init, and/or wait for its ready event:
+
+```js
+// Queue now; the host drains this when it initializes.
+(window.__feedBackMinigamesPending ||= []).push(spec);
+// Belt and braces: if the host is already up, or when it announces itself, register directly.
+window.feedBackMinigames?.register(spec);
+window.addEventListener('feedBack-minigames-ready', () => window.feedBackMinigames.register(spec));
+```
+
+Registration is idempotent by `spec.id`, so queueing *and* handling the ready event registers once.
+
+### 22. Declare a `minigame` manifest block; keep `spec.id` === plugin `id`
+
+Put a `minigame` block in your `plugin.json` (display metadata — title, tagline, thumbnail,
+modifiers) and register a runtime spec whose **`id` exactly equals your plugin `id`**. The host
+treats the manifest as authoritative for display and the JS spec as the runtime behaviour; if the
+two ids diverge, runs are misattributed and your manifest metadata is dropped. (This is the rule 2
+`id` contract, applied to minigames.)
+
+### 23. Implement `start`/`stop` — and release in `stop()` everything you create
+
+Your spec provides `start({ container, modifiers, sdk })` (required) and `stop()`. Render your game
+into the **`container` the host gives you**; drive input and scoring through the **`sdk`**. The host
+tears your session down on navigation away mid-run (a `screen:changed`), and on teardown it cancels
+**only its own** resources — its scheduler timers, the stage DOM, the summary listener. **Every
+`requestAnimationFrame` loop, `AudioContext`, `getUserMedia` stream, timer, and listener *you* open
+is yours to release in `stop()`.** The host cannot cancel a loop it never knew about, so anything
+you forget leaks past the end of your game and keeps burning the main thread (see rule 9).
+
+### 24. Make `start` supersede-safe
+
+A user can double-tap a game tile, or navigate away while your `start` is still awaiting. Guard
+against both: flip a synchronous "starting" flag on entry (don't rely on an async-set "active"
+flag), and capture a start generation you re-check after every `await`, bailing if it changed. An
+in-flight start that lost its race must not finish mounting or begin a run after teardown.
+
+### 25. Be standalone by default; set `usesPlayer` only if you drive the highway
+
+Minigames share the **guitar input**, not the song library or playback — a game is standalone by
+default and is torn down on **any** screen change. Only if your game deliberately navigates to the
+player screen and drives the note-highway itself should you mark it `usesPlayer`, which tells the
+host not to tear you down for that one navigation. If you set it, you own your own
+abandonment/cleanup for that hop.
+
+### 26. Let the host score and persist; use the SDK for audio; expect one session
+
+- **Report results, don't persist them.** End a run through the SDK (`end({ score, durationMs,
+  modifiers, meta })`); the host owns the runs database, the profile, and XP/progression, writes
+  them atomically, and reconciles with the app's unified XP. Don't hand-roll a scores file. Keep
+  `modifiers`/`meta` small (the host caps them).
+- **Use the SDK's scoring/audio helpers** rather than opening your own microphone — on desktop the
+  SDK pulls post-noise-gate frames from the native engine, where a naive `getUserMedia` would grab
+  the wrong device.
+- **Assume exactly one active session.** The host runs a single game at a time with singleton
+  overlays; it does **not** support two concurrent minigame sessions (e.g. under splitscreen). Don't
+  build a game that assumes it can run alongside another.
+
+---
+
 ## Shipping & good citizenship
 
-### 21. Fail soft, log clearly
+### 27. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -332,25 +406,25 @@ than tripping the auto-revert and dropping the user back to the default visualiz
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 22. Degrade gracefully across Host versions
+### 28. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 23. Only declare capabilities you actually implement
+### 29. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 24. Mind the security boundary
+### 30. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 25. Ship a README and a changelog
+### 31. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -396,6 +470,16 @@ note changes per version. It costs little and saves every future reader — incl
       leakage, no shared global keys for per-panel controls).
 - [ ] Persistence is left to the Host (no hand-rolled `localStorage`); if self-managed, writes are
       quota-safe (in-memory fallback staged before `setItem`) and never on a per-frame path.
+
+**Minigames (if you register into the `minigames` host):**
+
+- [ ] Registration binds late (pending queue + `feedBack-minigames-ready`), never assuming
+      `window.feedBackMinigames` exists at eval.
+- [ ] A `minigame` manifest block is declared and `spec.id` === the plugin `id`.
+- [ ] `stop()` releases every rAF loop, `AudioContext`, `getUserMedia` stream, timer, and listener
+      the game opened; `start` is supersede-safe.
+- [ ] Standalone by default (`usesPlayer` only if the game drives the highway); results reported via
+      the SDK (host owns scoring/persistence); assumes a single active session.
 
 **Capabilities & shipping:**
 
