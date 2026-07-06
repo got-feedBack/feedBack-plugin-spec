@@ -342,7 +342,8 @@ the host's pending queue, which the host drains on init, and/or wait for its rea
 (window.__feedBackMinigamesPending ||= []).push(spec);
 // Belt and braces: if the host is already up, or when it announces itself, register directly.
 window.feedBackMinigames?.register(spec);
-window.addEventListener('feedBack-minigames-ready', () => window.feedBackMinigames.register(spec));
+window.addEventListener('feedBack-minigames-ready',
+  () => window.feedBackMinigames.register(spec), { once: true });
 ```
 
 Registration is idempotent by `spec.id`, so queueing *and* handling the ready event registers once.
@@ -382,8 +383,9 @@ abandonment/cleanup for that hop.
 
 ### 26. Let the host score and persist; use the SDK for audio; expect one session
 
-- **Report results, don't persist them.** End a run through the SDK (`end({ score, durationMs,
-  modifiers, meta })`); the host owns the runs database, the profile, and XP/progression, writes
+- **Report results, don't persist them.** End a run through the `sdk` your `start` received
+  (`sdk.end({ score, durationMs, modifiers, meta })`); the host owns the runs database, the profile,
+  and XP/progression, writes
   them atomically, and reconciles with the app's unified XP. Don't hand-roll a scores file. Keep
   `modifiers`/`meta` small (the host caps them).
 - **Use the SDK's scoring/audio helpers** rather than opening your own microphone — on desktop the
