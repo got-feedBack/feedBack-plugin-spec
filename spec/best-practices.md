@@ -656,7 +656,7 @@ non-trivial plugin.
 A bundle gets shared with maintainers and is often attached to a public issue. Treat everything you
 contribute as **public**: no tokens, API keys, or credentials; no absolute filesystem paths or
 usernames; no raw audio or other user content. Redact aggressively and keep each contribution small
-(on the order of tens of KB, not megabytes). This is the security boundary (rule 48) applied to
+(on the order of tens of KB, not megabytes). This is the security boundary (rule 51) applied to
 diagnostics — the one place it's easy to leak by accident.
 
 ---
@@ -700,9 +700,78 @@ mixer reflects state, it doesn't store it).
 
 ---
 
+## Onboarding tours
+
+Any plugin can ship a guided **tour** — a sequence of highlighted steps that walks a user through
+its screen. The Host has a built-in tour engine; you supply the tour, it runs it. For most plugins
+this is pure data and needs no JavaScript.
+
+### 45. Ship a tour as data (`tour.json`)
+
+Declare a `tour` key in your `plugin.json` pointing at a `tour.json`, which the Host serves and runs.
+The file is a small, declarative list of steps:
+
+```json
+{
+  "version": 1,
+  "tour": [
+    { "id": "welcome", "title": "Welcome", "content": "What this screen does.",
+      "shape": "bubble", "position": "auto" },
+    { "id": "search", "selector": "#my-plugin-search", "title": "Search",
+      "content": "Filter as you type.", "shape": "spotlight", "position": "bottom" }
+  ]
+}
+```
+
+Each step is either a centered **`bubble`** (no target) or a **`spotlight`** that highlights the
+element named by `selector`. Practical rules:
+
+- **Target elements you own.** Point `selector` at stable ids inside *your* screen — not the app
+  shell's markup, which moves between versions (this is rule 10 again).
+- **Guard async targets with `waitFor`.** If a step's element renders after a fetch, give the step a
+  `waitFor` selector so the engine waits for it instead of skipping the step.
+- **Keep it short and re-runnable.** A tour is an intro, not a manual; and a user may replay it, so
+  steps must not assume first-run-only state.
+
+### 46. Only reach for the client tour API when the steps are dynamic
+
+If your steps depend on runtime state (what the user has, which mode is active), register a tour on
+the client instead of shipping static JSON. The first argument is **your plugin `id`** — the tour is
+keyed by it, so it's namespaced per plugin (rule 2) and can't collide with another plugin's tour:
+`window.feedBackTour.register("my-plugin", { name, buildSteps, onStart, onComplete, autoPrompt })`,
+where `buildSteps` computes the step list when the tour starts. Use `autoPrompt` to *offer* the tour on first visit — offer once and remember the
+answer; don't re-nag on every visit. Static `tour.json` is still the right default; only take on the
+client API when data alone can't express the tour.
+
+---
+
+## Library providers
+
+A plugin can add **song sources** to the library — a folder scanner, a remote catalog, a generated
+set — by registering a *library provider* on the server. The app then lists and plays songs from
+your source alongside the built-in local library.
+
+### 47. Add song sources as a library provider
+
+Register in your `setup()` via `context["register_library_provider"](provider)`. Keep your
+provider's `id` so you can later call `context["unregister_library_provider"](provider_id)` — there's
+no formal per-plugin teardown callback, so unregister explicitly if you re-register (e.g. on a
+config change) or before replacing a provider, to avoid leaving a stale source registered. Two more
+things to know:
+
+- **Attribution is enforced, not declared.** The Host stamps every provider with *your* plugin as its
+  owner — you can't register a provider attributed to another plugin, and the built-in `local`
+  provider can't be removed.
+- **Declare the `library` capability** in your manifest too, so the capability inspector and
+  diagnostics can show your source before its route code runs, and implement the provider's read/query
+  methods (listing, artists, stats, per-song data) per the Host's library-provider contract. Return
+  results promptly and page large libraries — the provider is queried on the app's library screen.
+
+---
+
 ## Shipping & good citizenship
 
-### 45. Fail soft, log clearly
+### 48. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -711,25 +780,25 @@ mixer reflects state, it doesn't store it).
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 46. Degrade gracefully across Host versions
+### 49. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 47. Only declare capabilities you actually implement
+### 50. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 48. Mind the security boundary
+### 51. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 49. Ship a README and a changelog
+### 52. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -835,6 +904,13 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Keyboard shortcuts via `registerShortcut` with the narrowest scope, unregistered on teardown.
 - [ ] Audio levels via `feedBack.audio.registerFader` (gated on `feedBack:audio:ready`); you own
       persistence.
+
+**Tours & library providers (if applicable):**
+
+- [ ] A tour, if any, ships as declarative `tour.json` (targeting your own stable selectors, `waitFor`
+      for async targets); the client tour API is used only for dynamic steps and offers once.
+- [ ] A library provider registers via `context["register_library_provider"]`, unregisters on
+      teardown, declares the `library` capability, and pages large sources.
 
 **Capabilities & shipping:**
 
