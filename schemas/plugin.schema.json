@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://got-feedback.github.io/feedBack-plugin-spec/schemas/plugin.schema.json",
+  "title": "feedBack plugin manifest",
+  "description": "Schema for plugin.json, the manifest of a feedBack plugin. See spec/plugin-spec-v1.md §4. Unknown keys are permitted and ignored by the Host, so the manifest stays forward-extensible.",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "description": "Stable identity. MUST equal the plugin's directory name."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name. Defaults to id when absent."
+    },
+    "version": {
+      "type": "string",
+      "description": "Plugin version. Semver RECOMMENDED (e.g. \"1.3.3\")."
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line description for plugin listings."
+    },
+    "type": {
+      "type": "string",
+      "description": "Plugin kind, e.g. \"visualization\"."
+    },
+    "script": {
+      "type": "string",
+      "description": "Client JS module, path relative to the plugin directory."
+    },
+    "screen": {
+      "type": "string",
+      "description": "Client screen markup, path relative to the plugin directory."
+    },
+    "styles": {
+      "type": "string",
+      "description": "CSS file, path relative to the plugin directory."
+    },
+    "routes": {
+      "type": "string",
+      "description": "Python module contributing server routes, relative path."
+    },
+    "tour": {
+      "type": "string",
+      "description": "Guided-tour definition, relative path."
+    },
+    "icon": {
+      "type": "string",
+      "description": "Navigation icon (emoji or asset reference)."
+    },
+    "category": {
+      "type": "string",
+      "description": "Grouping hint for the plugin list."
+    },
+    "fullscreen": {
+      "type": "boolean",
+      "description": "Screen requests a full-viewport layout."
+    },
+    "bundled": {
+      "type": "boolean",
+      "description": "Declares a first-party bundled plugin. Bundled status also requires the in-tree location and folder-name == id."
+    },
+    "private": {
+      "type": "boolean",
+      "description": "Marks the plugin as not for public listing."
+    },
+    "nav": {
+      "description": "Navigation-entry overrides (object) or a boolean to force/suppress the entry.",
+      "type": ["object", "boolean"]
+    },
+    "settings": {
+      "type": "object",
+      "description": "Settings-panel declaration.",
+      "required": ["html"],
+      "additionalProperties": true,
+      "properties": {
+        "html": {
+          "type": "string",
+          "description": "Settings-panel markup, relative path."
+        },
+        "category": {
+          "type": "string",
+          "description": "Grouping hint, e.g. \"graphics\", \"audio\"."
+        },
+        "server_files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Host-relative paths this plugin persists; carried by settings export/import."
+        }
+      }
+    },
+    "settings_schema": {
+      "type": "object",
+      "description": "Structured description of the plugin's stored settings."
+    },
+    "diagnostics": {
+      "type": "object",
+      "description": "Files to include in a diagnostics bundle.",
+      "additionalProperties": true,
+      "properties": {
+        "server_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "standards": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Standards the plugin claims to implement, e.g. \"capability-pipelines.v1\"."
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "Capability declarations keyed by domain. See spec §8.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "roles": { "type": "array", "items": { "type": "string" } },
+          "commands": { "type": "array", "items": { "type": "string" } },
+          "events": { "type": "array", "items": { "type": "string" } },
+          "mode": { "type": "string" },
+          "compatibility": {
+            "type": "string",
+            "enum": ["none", "shim-allowed", "degrade-noop", "required", "legacy-window-shim"]
+          },
+          "ownership": { "type": "string" },
+          "safety": { "type": "string" },
+          "version": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

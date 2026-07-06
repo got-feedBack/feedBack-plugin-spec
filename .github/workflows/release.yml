@@ -1,0 +1,57 @@
+name: release
+
+# Release-on-merge. Whenever main advances, this cuts a GitHub Release for the
+# newest released version in CHANGELOG.md — but only if that release does not
+# already exist, so it is safe to run on every push. A PR that bumps the version
+# (moving `[Unreleased]` to a dated `## [X.Y.Z]` heading + the spec/README bumps the
+# version-consistency check enforces) therefore publishes a Release automatically
+# once it merges. `gh release create --target` also creates the `vX.Y.Z` tag.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Determine newest released version
+        id: ver
+        run: echo "version=$(python tools/changelog_extract.py --latest-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if the release already exists
+        id: check
+        if: steps.ver.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the release (and its tag)
+        if: steps.ver.outputs.version != '' && steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/changelog_extract.py "${{ steps.ver.outputs.version }}" > RELEASE_NOTES.md
+          gh release create "v${{ steps.ver.outputs.version }}" \
+            --target "${GITHUB_SHA}" \
+            --title "v${{ steps.ver.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md

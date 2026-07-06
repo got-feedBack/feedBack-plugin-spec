@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+<!--
+  Bake the spec version into a top announcement bar at build time, from the
+  SPEC_VERSION env var (set by the pages/docs workflows to the newest released
+  CHANGELOG version). Deterministic, and does not depend on the client-side
+  GitHub release widget. See .github/workflows/pages.yml.
+-->
+{% block announce %}
+  feedBack plugin specification — <strong>v{{ config.extra.spec_version }}</strong>
+{% endblock %}

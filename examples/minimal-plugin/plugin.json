@@ -1,0 +1,6 @@
+{
+  "id": "minimal-plugin",
+  "name": "Minimal Plugin",
+  "version": "1.0.0",
+  "description": "The smallest valid feedBack plugin: a manifest and nothing else."
+}
