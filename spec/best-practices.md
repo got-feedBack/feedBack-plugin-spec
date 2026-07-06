@@ -504,13 +504,17 @@ fire during playback — see rule 9), and **unsubscribe when your screen is hidd
 
 To navigate, play, or control playback, call the Host API — never click or mutate the app's own
 controls (`document.querySelector('#btn-loop-…')` and friends are private and move between UI
-versions). The current surface includes:
+versions). The surface comes in two forms; **feature-detect** whichever one you call before relying
+on it:
 
-- **Navigation:** `feedBack.navigate(screenId, params)` (and `getNavParams()` to read them on the
-  other side), `showScreen(id)`, `setReturnScreen(id)`.
-- **Playback / transport:** `playSong(...)`, `seek(seconds, reason)`, `setLoop(a, b)` /
-  `clearLoop()` / `getLoop()`, the `playQueue` API, and the live read-only state `currentSong` /
-  `isPlaying`.
+- **On the `window.feedBack` object:** `feedBack.navigate(screenId, params)` and
+  `feedBack.getNavParams()`, `feedBack.seek(seconds, reason)`, `feedBack.setLoop(a, b)` /
+  `feedBack.clearLoop()` / `feedBack.getLoop()`, and the live read-only state `feedBack.currentSong`
+  / `feedBack.isPlaying`.
+- **Legacy top-level globals** (supported but being migrated behind `feedBack`, per rule 32's
+  caution about the surface): `window.showScreen(id)`, `window.playSong(...)`,
+  `window.setReturnScreen(id)`, and the `window.feedBack.playQueue` queue API. Prefer the
+  `feedBack`-namespaced call where one exists.
 
 Going through the API keeps you working when the app's markup changes and avoids fighting the Host
 for control of the transport.
