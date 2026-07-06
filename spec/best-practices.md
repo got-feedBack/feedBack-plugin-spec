@@ -414,8 +414,10 @@ the simplest path to a non-monolithic plugin.)
 If you split at runtime instead, know the constraint that shapes everything else: **`screen.js` runs
 as a *classic* script, not an ES module.** Top-level `import` / `export` and `import.meta` do not
 work in it. Split files therefore share state through **`window`** (namespaced under your `id`, per
-rule 2), not through ES exports — each file attaches what it provides to a `window.<yourId>…` object
-and reads its dependencies from there.
+rule 2), not through ES exports — each file attaches what it provides to a per-plugin object and
+reads its dependencies from there. Key that object by `id` with **bracket notation**, since an `id`
+may contain `-` (which isn't a valid JS identifier): `window['my-plugin']` or a shared
+`(window.__feedBackPlugins ||= {})['my-plugin']` — not `window.my-plugin`, which is a syntax error.
 
 ### 28. Serve extra files from `assets/`, and reference them by absolute URL
 
@@ -434,8 +436,8 @@ base constant once and use it everywhere:
 
 ```js
 const ASSET_BASE = '/api/plugins/my-plugin/assets/';   // hardcode your id
-// ES module served from assets/ (the Host serves it with a JS MIME):
-const util = await import(ASSET_BASE + 'lib/util.js');
+// screen.js is a classic script, so there's no top-level await — use .then (or an async IIFE):
+import(ASSET_BASE + 'lib/util.js').then(util => { /* ES module served from assets/ */ });
 // or a classic, window-attaching helper:
 loadScriptOnce(ASSET_BASE + 'lib/legacy.js');          // see rule 29
 ```
@@ -447,21 +449,23 @@ helpers that attach to `window`.
 ### 29. Load each split file exactly once
 
 The Host may re-run your `screen.js` mid-session (rule 12), and your own screen may re-mount — so any
-runtime loading must be **idempotent**. De-dupe it: track what you've loaded (a `Set` of URLs, or a
-check for the `window.<yourId>…` symbol the file defines) and skip a second load. Otherwise
-re-hydration injects duplicate `<script>` tags or re-runs a module's side effects, which is exactly
-the duplication rule 12 exists to prevent.
+runtime loading must be **idempotent**. De-dupe it, but keep the cache **on `window`** (a module-local
+`Set` is wiped when `screen.js` re-runs, so it wouldn't actually prevent a re-load), cache the
+**in-flight promise** so concurrent callers share one load, and **drop the entry on failure** so a
+transient error can be retried:
 
 ```js
-const _loaded = new Set();
+const _loading = (window.__myPluginScripts ||= new Map());   // survives screen.js re-run
 function loadScriptOnce(src) {
-  if (_loaded.has(src)) return Promise.resolve();
-  _loaded.add(src);
-  return new Promise((res, rej) => {
-    const s = document.createElement('script');       // classic; attaches to window
+  let p = _loading.get(src);
+  if (p) return p;                                            // resolved or in-flight — reuse
+  p = new Promise((res, rej) => {
+    const s = document.createElement('script');               // classic; attaches to window
     s.src = src; s.onload = res; s.onerror = rej;
     document.body.appendChild(s);
-  });
+  }).catch(err => { _loading.delete(src); throw err; });      // allow retry after a failure
+  _loading.set(src, p);
+  return p;
 }
 ```
 
@@ -557,8 +561,8 @@ note changes per version. It costs little and saves every future reader — incl
 
 - [ ] Extra JS lives under `assets/` (or a `routes.py`-served dir), not the plugin root, and is
       referenced by absolute `/api/plugins/<id>/…` URLs.
-- [ ] Split files share state via `window.<id>…` (classic script — no `import`/`export` in
-      `screen.js`).
+- [ ] Split files share state via a bracket-keyed `window["<id>"]` namespace (classic script — no
+      `import`/`export` or top-level `await` in `screen.js`).
 - [ ] Runtime loads are de-duped so re-hydration doesn't load them twice.
 
 **Capabilities & shipping:**
