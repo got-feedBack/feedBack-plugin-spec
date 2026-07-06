@@ -121,6 +121,15 @@ for how the document, manifest, and per-plugin versions relate.
   and the built-in `local` provider can't be removed; declare the `library` capability and page large
   sources). Added matching checklist items. Docs only.
 
+- Best-practices guide: added a **"Highway overlays and note-state providers"** section for
+  plugins that participate in the note-highway *without* replacing its renderer. Covers **overlays**
+  (a layer on top of whatever renderer is active — own your rAF + canvas, re-read state each frame,
+  respect lefty/invert, gate the built-in `project`/`fretX` geometry helpers on
+  `highway.isDefaultRenderer()`, track the `highway:visibility` event for sibling DOM, clean up on
+  toggle-off; not `type: "visualization"`, not in the picker), and the **note-state provider**
+  (`highway.setNoteStateProvider(fn)` — a scorer lights the note gem itself on a correct hit; a single
+  global surface, cleared on stop). Added matching checklist items. Docs only.
+
 ## [0.1.0] - 2026-07-05
 
 Initial draft of the feedBack plugin specification.
