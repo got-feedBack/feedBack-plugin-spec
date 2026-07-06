@@ -82,6 +82,15 @@ for how the document, manifest, and per-plugin versions relate.
   `currentSong`/`playQueue`) **rather than its DOM controls**, **wrapper discipline** for hooking
   Host globals (call and `await` the original, install once, clean up, no load-order assumptions),
   and the **v2/v3 player-chrome** mount contract. Added a matching checklist block. Docs only.
+- Best-practices guide: added a **"Server-side robustness"** section for `routes`-shipping plugins,
+  ground-truthed against the loader. Covers **declaring Python deps in `requirements.txt`** (no
+  manifest field; installs are hash-keyed, sequential, and delay later plugins — keep them minimal
+  and pinned; a failed install is non-fatal so guard heavy/optional imports), **not blocking the
+  event loop** (a fast `setup()` killed at a ~60s timeout; a blocking `async def` handler freezes the
+  server — use non-blocking I/O or a plain `def` that runs in the threadpool), **splitting server
+  code via `context["load_sibling"]`** rather than bare imports that collide across plugins in
+  `sys.modules`, and **logging through `context["log"]` (never `print()`)** plus route namespacing.
+  Added a matching checklist block. Docs only.
 
 ## [0.1.0] - 2026-07-05
 
