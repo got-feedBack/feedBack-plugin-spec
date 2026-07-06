@@ -9,6 +9,15 @@ for how the document, manifest, and per-plugin versions relate.
 
 ## [Unreleased]
 
+### Changed
+- §8 (Capabilities) and `schemas/plugin.schema.json` now document the real capability-declaration
+  vocabulary, ground-truthed against every bundled plugin: the domain keys and fields are an
+  **open set** defined by the declared standard (e.g. `capability-pipelines.v1`), and a declaration
+  may carry `operations` / `requests` (alongside `commands`), `emits` / `observes` (alongside
+  `events`), plus `kind` and `description`. The `compatibility` field is no longer a hard schema
+  enum (its values are an open set); the observed values are documented instead. Purely additive
+  and clarifying — every existing manifest still validates.
+
 ## [0.1.0] - 2026-07-05
 
 Initial draft of the feedBack plugin specification.
