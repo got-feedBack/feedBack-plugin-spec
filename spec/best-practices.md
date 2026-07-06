@@ -793,8 +793,9 @@ picker (it's typically a navbar toggle). Building one:
 - **Gate 2D-geometry helpers on the default renderer.** If you position with the built-in highway's
   geometry helpers (`highway.project` / `highway.fretX`), guard on `highway.isDefaultRenderer()` —
   those coordinates describe the built-in 2D highway and won't match a custom 3D/piano scene, so skip
-  drawing when it returns false. Renderer-agnostic overlays (that use `getNotes()` /
-  `getChordTemplates()` and their own layout) don't need the guard.
+  drawing when it returns false. Renderer-agnostic overlays (that read note/chord data via the
+  highway's data accessors — e.g. `highway.getNotes()` / `highway.getChordTemplates()` — and do
+  their own layout) don't need the guard.
 - **Track highway visibility if you mount your own DOM.** Listen for the `highway:visibility`
   (`{ visible, canvas }`) event and hide/show your overlay canvas to match — while the highway is
   hidden the Host skips its draw, but your sibling DOM won't hide itself. Cancel your rAF and hide
@@ -904,7 +905,7 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Persistence is left to the Host (no hand-rolled `localStorage`); if self-managed, writes are
       quota-safe (in-memory fallback staged before `setItem`) and never on a per-frame path.
 
-**Highway overlays / note providers (if applicable):**
+**Highway overlays / note-state providers (if applicable):**
 
 - [ ] An overlay owns its own rAF + canvas, re-reads state each frame, gates `project`/`fretX` on
       `isDefaultRenderer()`, tracks `highway:visibility`, and cleans up on toggle-off — and does not
