@@ -349,8 +349,9 @@ are:
   `requester`).
 - **Verb/action tokens** the plugin services — one or more of `operations`, `commands`, or
   `requests` (arrays of string tokens; a domain/standard picks which name it uses).
-- **Event tokens** — one or more of `events`, `emits`, or `observes` (arrays of string tokens for
-  events the plugin emits or observes).
+- **Event tokens** — arrays of string tokens naming events. `events` and `emits` are events the
+  plugin **emits**; `observes` is events the plugin **observes** (a domain/standard picks which
+  names it uses).
 - `mode` — participation mode (e.g. `active`).
 - `kind` — a domain-specific classifier for the declaration (e.g. `command`).
 - `compatibility` — how the plugin behaves against an incompatible counterpart; observed values
