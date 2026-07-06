@@ -62,7 +62,7 @@ else — it loads, contributes nothing, and does no harm.
 
 A plugin is a directory whose name equals its `id`:
 
-```
+```text
 tuner/                     # directory name == manifest "id"
 ├── plugin.json            # REQUIRED — the manifest
 ├── screen.js              # client script (manifest "script")
@@ -128,8 +128,9 @@ navigation entry, the settings store, the routes namespace, and the capability g
 - The plugin's **directory name MUST equal `id`.** A Host that finds a directory whose name does
   not match the manifest `id` MUST NOT treat it as bundled and SHOULD skip or warn (see
   [§5.3](#53-bundled-vs-user-installed)).
-- `id` SHOULD match `^[a-z0-9][a-z0-9_-]*$`. A Host MUST reject a non-string or empty `id` (such
-  a directory is not a plugin).
+- `id` MUST match `^[a-z0-9][a-z0-9_-]*$` (consistent with [§3](#3-anatomy-of-a-plugin), the
+  manifest schema, and the reference validator, which all treat a non-conforming `id` as an
+  error). A Host MUST reject a non-string or empty `id` — such a directory is not a plugin.
 - `id` MUST be treated as a stable, public identifier. Changing a plugin's `id` is a new plugin,
   not a new version of the old one — it orphans stored settings keyed to the old `id`.
 

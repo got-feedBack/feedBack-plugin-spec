@@ -13,7 +13,7 @@ and grow it toward [`examples/full-plugin`](../examples/full-plugin).
 
 The smallest valid plugin is a folder with one file:
 
-```
+```text
 my-plugin/
 └── plugin.json      →  {"id": "my-plugin", "name": "My Plugin"}
 ```

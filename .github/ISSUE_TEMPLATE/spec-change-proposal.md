@@ -31,7 +31,7 @@ What you want to add or change. Be concrete about the **manifest and/or loading 
 - New / changed **loading or surface behaviour**:
 - Example snippet:
 
-```json
+```jsonc
 // plugin.json fragment
 ```
 

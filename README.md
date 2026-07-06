@@ -23,7 +23,7 @@ with a screen, a settings panel, server routes, and/or a declared capability.
 A plugin is a directory whose name equals its `id`. Only `plugin.json` is required; every other
 file exists because the manifest points at it.
 
-```
+```text
 tuner/                     # directory name == manifest "id"
 ├── plugin.json            # the manifest (required)
 ├── screen.js              # client script      (manifest "script")
