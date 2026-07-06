@@ -67,6 +67,14 @@ for how the document, manifest, and per-plugin versions relate.
   `start` (double-tap / navigate-away races), standalone-by-default vs `usesPlayer`, and host-owned
   scoring/persistence (report via the SDK; single active session). Added a Minigames checklist block.
   Docs only.
+- Best-practices guide: added an **"Organizing client code across files"** section for splitting a
+  plugin's client JS instead of shipping one monolithic `screen.js`, ground-truthed against how the
+  Host loads and serves plugin JS. Covers bundling to one `screen.js` as the simplest path;
+  the constraint that `screen.js` is a **classic script** (no `import`/`export`/`import.meta` — split
+  files share state via `window`); serving extra files from **`assets/`** (the plugin root isn't
+  servable) referenced by **absolute `/api/plugins/<id>/…` URLs** (relative resolves against the
+  document, not the script); and **idempotent** runtime loading so re-hydration doesn't double-load.
+  Added a matching checklist block. Docs only.
 
 ## [0.1.0] - 2026-07-05
 
