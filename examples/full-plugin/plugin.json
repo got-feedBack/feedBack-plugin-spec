@@ -1,0 +1,26 @@
+{
+  "id": "full-plugin",
+  "name": "Full Example Plugin",
+  "version": "1.0.0",
+  "description": "A worked example exercising every plugin surface: screen, styles, settings, and server routes.",
+  "type": "visualization",
+  "script": "screen.js",
+  "styles": "assets/plugin.css",
+  "settings": {
+    "html": "settings.html",
+    "category": "graphics"
+  },
+  "routes": "routes.py",
+  "capabilities": {
+    "diagnostics": {
+      "roles": ["observer"],
+      "commands": ["snapshot"],
+      "events": [],
+      "mode": "active",
+      "compatibility": "none",
+      "ownership": "diagnostic-only",
+      "safety": "diagnostic-only",
+      "version": 1
+    }
+  }
+}

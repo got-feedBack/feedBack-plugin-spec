@@ -1,0 +1,6 @@
+# Development / CI dependencies for the feedBack plugin-spec repo.
+# The reference validator needs only jsonschema; pytest + ruff are for the
+# test and lint jobs.
+jsonschema
+pytest
+ruff

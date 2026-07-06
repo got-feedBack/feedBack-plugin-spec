@@ -1,0 +1,75 @@
+site_name: feedBack plugin specification
+site_url: https://got-feedback.github.io/feedBack-plugin-spec/
+site_description: >-
+  The specification and best-practices guide for building plugins for feedBack —
+  the plugin.json manifest, discovery and loading, client and server surfaces, and
+  capability declarations.
+repo_url: https://github.com/got-feedback/feedBack-plugin-spec
+repo_name: got-feedback/feedBack-plugin-spec
+
+docs_dir: docs
+# Generated pages (docs/plugin-spec-v1.md, docs/best-practices.md, docs/changelog.md,
+# docs/schemas/) are assembled by tools/gen_docs.py and are not committed; only
+# docs/index.md and mkdocs.yml are. Don't fail the build over the generated tree.
+use_directory_urls: false
+validation:
+  nav:
+    omitted_files: ignore
+  links:
+    absolute_links: ignore
+    not_found: ignore
+
+theme:
+  name: material
+  custom_dir: overrides
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.top
+    - navigation.sections
+    - navigation.tracking
+    - toc.follow
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets
+
+nav:
+  - Home: index.md
+  - Specification: plugin-spec-v1.md
+  - Best practices: best-practices.md
+  - Changelog: changelog.md
+
+extra:
+  # Stamped at build time by the pages/docs workflows (SPEC_VERSION = newest released
+  # CHANGELOG version). Rendered by overrides/main.html as the announcement bar.
+  spec_version: !ENV [SPEC_VERSION, "dev"]

@@ -1,0 +1,21 @@
+<!--
+  Settings panel for the full-plugin example. The Host renders this markup in the
+  plugin's settings slot, grouped under settings.category ("graphics"). Scope any
+  styles/scripts to the panel; persist values through the plugin's own routes
+  (/api/plugin/full-plugin/settings), not by writing files directly from the client.
+-->
+<div class="full-plugin-settings">
+  <label>
+    Color
+    <select data-setting="color">
+      <option value="indigo">Indigo</option>
+      <option value="crimson">Crimson</option>
+      <option value="emerald">Emerald</option>
+    </select>
+  </label>
+
+  <label>
+    Intensity
+    <input type="range" min="0" max="10" step="1" data-setting="intensity" />
+  </label>
+</div>

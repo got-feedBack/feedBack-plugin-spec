@@ -1,0 +1,18 @@
+/*
+ * Styles for the full-plugin example. Every selector is scoped under the plugin's
+ * own root class (.full-plugin / .full-plugin-settings) so nothing leaks into the
+ * rest of the app (spec §6.3).
+ */
+.full-plugin {
+  padding: 1rem;
+}
+
+.full-plugin h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.full-plugin-settings label {
+  display: block;
+  margin: 0.5rem 0;
+}
