@@ -43,7 +43,8 @@ So:
 - **The folder name MUST equal the `id`, exactly, including case.** A folder named `Tuner` or
   `tuner-plugin` holding `{"id": "tuner"}` is simply not discovered — the most common "why won't my
   plugin load?" (see [spec §5.2](plugin-spec-v1.md#52-the-directory-name-rule)).
-- **Stick to `^[a-z0-9][a-z0-9_-]*$` (snake_case is the house style).** The charset isn't
+- **Stick to `^[a-z0-9][a-z0-9_-]*$` (lowercase, with `-` or `_` separators — both are fine and
+  both are used in practice).** The charset isn't
   cosmetic: the `id` is spliced into a Python module name and DOM/JS identifiers. Uppercase breaks
   the exact-match discovery rule, and dots/spaces/other punctuation break module or element naming.
   The reference validator rejects anything outside this set — run it (`python tools/validate.py`).
@@ -361,8 +362,8 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Folder name equals `id` exactly (incl. case), matching `^[a-z0-9][a-z0-9_-]*$`.
 - [ ] `id` is specific and doesn't collide with a bundled plugin (a bundled `id` wins; yours would be
       silently ignored) or a reserved one (`capability_inspector`, `app_tour_*`).
-- [ ] Anything in shared space is namespaced by `id`: `localStorage` keys, `window` globals, routes,
-      and CSS.
+- [ ] Global namespaces are prefixed by `id`: `localStorage` keys and any `window` globals. (Routes
+      and CSS are covered separately below.)
 - [ ] `plugin.json` is valid against [`schemas/plugin.schema.json`](../schemas/plugin.schema.json)
       (`python tools/validate.py path/to/my-plugin`).
 - [ ] Every manifest file reference resolves to a shipped file.
