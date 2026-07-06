@@ -97,6 +97,13 @@ for how the document, manifest, and per-plugin versions relate.
   coexist — base/preflight reset **off**, selectors scoped, **no Tailwind Play CDN / runtime CSS
   engine** (slow, offline-hostile), and bump `version` to cache-bust the sheet. Added a matching
   checklist block. Docs only.
+- Best-practices guide: added a **"Diagnostics"** section. Covers contributing plugin state to the
+  user-exportable diagnostics bundle — **client** via `window.feedBack.diagnostics.contribute(id,
+  payload)` (idempotent; last snapshot before export wins) and **server** via `diagnostics.server_files`
+  / `diagnostics.callable` (`"module:function"` returning dict/bytes/str; the Host catches exceptions
+  so a broken function never crashes the export) — and the rule that a bundle is effectively public,
+  so it **MUST NOT contain secrets, credentials, absolute paths, usernames, or raw user content** and
+  should stay small with a `schema` field. Added a matching checklist block. Docs only.
 
 ## [0.1.0] - 2026-07-05
 
