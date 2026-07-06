@@ -35,6 +35,17 @@ for how the document, manifest, and per-plugin versions relate.
   plugins through the capability `claim`/`dispatch`/`release` flow rather than their globals.
   Regrouped the guide (Getting started / Server routes / Client screen / Shipping) and expanded the
   pre-publish checklist with a client-performance block. Docs only.
+- Best-practices guide: added a **"Visualizations"** section for `type: "visualization"` plugins,
+  ground-truthed against the Host's renderer contract and recent splitscreen/settings fixes. Covers
+  the **factory pattern** (`window.feedBackViz_<id>` returns a fresh renderer per call — required for
+  splitscreen's N simultaneous panels), the renderer interface (`draw`/`init`/`resize`/`destroy`/
+  `contextType`), per-instance resource ownership and `destroy()` cleanup, treating the per-frame
+  bundle as read-only, self-detecting canvas size drift, and **communicating settings via
+  `applySetting(key, value)` per instance** (declare `settings` on the `visualization` capability;
+  the Host applies each change to the specific per-panel instance) — including the concrete failure
+  modes recent fixes addressed (apply-live-not-reload, no cross-setting leakage, deliberate
+  per-panel vs global key scoping, fan-out to all panels, settings panel loads before the renderer),
+  plus the fail-safe auto-revert. Expanded the checklist with a Visualizations block. Docs only.
 
 ## [0.1.0] - 2026-07-05
 

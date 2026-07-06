@@ -179,9 +179,105 @@ the coupling the capability system exists to remove, and it breaks the moment th
 
 ---
 
+## Visualizations
+
+A plugin whose manifest sets `"type": "visualization"` can replace the app's note-highway
+renderer. The Host runs this renderer inside its own ~60 fps draw loop, and — critically — the app
+can show **several highways at once** (splitscreen). Everything below exists so one renderer works
+correctly when the Host makes many copies of it. The mechanism names here (the `feedBackViz_<id>`
+factory global, the renderer methods, `applySetting`) are the **current Host contract**; treat the
+principles as stable and the exact API as Host-versioned.
+
+### 15. Always register a factory, never a singleton
+
+Expose your renderer as a **factory function** — a zero-argument function the Host calls to get a
+**fresh renderer instance every time** — on the global `window.feedBackViz_<id>` (where `<id>` is
+your `plugin.json` `id`). Do **not** assign a single shared renderer object.
+
+This is the whole reason splitscreen works: the Host creates one highway per panel and calls your
+factory once per panel, so N panels get N independent renderers. A singleton would have every panel
+fight over one WebGL context, one canvas, and one set of meshes — the classic splitscreen bug.
+
+```js
+function createRenderer() {
+  // ALL state is per-instance closure state — one set per panel.
+  let canvas, gl, meshes, unsubscribe;
+  return {
+    contextType: 'webgl2',                 // '2d' (default) or 'webgl2'; read before init()
+    init(canvasEl, bundle) { canvas = canvasEl; /* acquire own context, build scene */ },
+    draw(bundle) { /* render this frame from the snapshot */ },   // the only REQUIRED method
+    resize(w, h) { /* rebuild framebuffers */ },
+    destroy() { unsubscribe?.(); /* free GL + DOM */ },
+  };
+}
+window.feedBackViz_my_viz = createRenderer;          // the global IS the factory function
+window.feedBackViz_my_viz.contextType = 'webgl2';    // optional static, read before constructing
+```
+
+The renderer interface: `draw(bundle)` is **required**; `init(canvas, bundle)`, `resize(w, h)`,
+`destroy()`, `contextType`, and `readyPromise` are optional. The Host lifecycle is
+`factory()` → `init(canvas, bundle)` → per-frame `draw(bundle)` → `resize` on canvas change →
+`destroy()` on renderer swap or stop.
+
+### 16. Keep every resource per-instance and release it in `destroy()`
+
+Hold your context, buffers, meshes, DOM overlays, and event subscriptions in the factory's closure,
+one set per instance — never in module-level globals or a single shared DOM node parented to "the"
+panel. `destroy()` runs on every swap and on stop and MUST release everything (unsubscribe, free GL,
+remove any DOM you added); a leak here multiplies by the number of panels. Resolve any DOM against
+**your own** instance's container, never a global `document.querySelector` that could grab a sibling
+panel's node.
+
+### 17. Treat the per-frame bundle as read-only, and keep `draw()` allocation-free
+
+The `bundle` the Host passes to `draw()` is a **snapshot object reused across frames** — its array
+fields are live, read-only references, not copies. Never mutate it, and never cache its identity or
+its arrays across frames. Because `draw()` runs ~60 times a second **per panel**, do no allocation
+and no DOM/layout work inside it (see rule 9) — precompute on `init`/`resize`.
+
+### 18. Self-detect canvas size changes
+
+Don't assume the Host will call your `resize()`. Under splitscreen the host may resize the highway
+without forwarding the call to your renderer, so check the canvas's width/height at the top of
+`draw()` against the last size you applied and rebuild your framebuffers when it drifts. (This was a
+real bug where 3D highways stayed framed for their pre-fullscreen size in splitscreen.)
+
+### 19. Communicate settings through `applySetting`, per instance — not a side channel
+
+For user-adjustable controls, declare a `settings` array on your `visualization` capability
+(`{ key, label, type: "toggle" | "range" | "select", default, min/max/step, options }`) and
+implement **`applySetting(key, value)`** on the renderer instance. The Host validates the
+descriptors, renders the controls, owns persistence, and calls `applySetting` **on each specific
+per-panel instance** — so a change reaches every panel and is inherently per-instance, with no
+shared global keys and no canvas-to-panel lookup to get wrong.
+
+Hard-won rules this replaces — the ways settings communication actually broke:
+
+- **Apply live; never reload.** Applying a setting via `location.reload()` reboots the app and drops
+  the user out of the settings panel. Update the running renderer instead.
+- **Don't let one setting leak into another.** If you migrate an old setting into a new one, back it
+  up **once** on load and persist it *without* re-broadcasting; a "mirror on every read" makes one
+  control silently overwrite another, and the render disagree with the UI.
+- **Scope keys deliberately.** Only genuinely per-panel controls get per-panel storage; shared state
+  (a palette, an uploaded asset) stays global, so a stale per-panel override can't shadow a global
+  edit or duplicate a heavy asset per panel.
+- **Reach every instance.** A settings change must fan out to all mounted panels, each re-reading in
+  its own scope — not just the panel that happens to be focused.
+- **The settings panel loads before your renderer.** `settings.html` is injected before your
+  `script` runs, so guard any calls into your renderer's globals (`window.myViz && window.myViz…`)
+  and let the panel hydrate its own controls from persisted values/defaults independently.
+
+### 20. Fail safe — the Host reverts a broken renderer
+
+If your `draw()` throws on several consecutive frames the Host automatically reverts to the built-in
+renderer and emits a revert event. Guard `draw()` so a transient error degrades one frame rather
+than tripping the auto-revert and dropping the user back to the default visualization.
+
+---
+
 ## Shipping & good citizenship
 
-### 15. Fail soft, log clearly
+### 21. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -190,25 +286,25 @@ the coupling the capability system exists to remove, and it breaks the moment th
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 16. Degrade gracefully across Host versions
+### 22. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 17. Only declare capabilities you actually implement
+### 23. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 18. Mind the security boundary
+### 24. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 19. Ship a README and a changelog
+### 25. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -236,6 +332,18 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Re-running `script` is a no-op (idempotent hydration) if you declare
       `plugin-runtime-idempotent.v1`.
 - [ ] rAF loops and event subscriptions stop when the screen is hidden; state is per-instance.
+
+**Visualizations (if `type` is `"visualization"`):**
+
+- [ ] `window.feedBackViz_<id>` is a **factory function** returning a fresh renderer per call, not a
+      shared object; all renderer state is per-instance closure state.
+- [ ] `draw(bundle)` is implemented; the bundle is treated as read-only and never cached; `draw()`
+      allocates nothing.
+- [ ] `destroy()` releases every context/DOM/subscription; DOM is resolved against the instance's
+      own container, not a global selector.
+- [ ] Canvas size drift is self-detected in `draw()` (don't rely on `resize()` being called).
+- [ ] Settings apply live via `applySetting(key, value)` on the instance (no reload, no cross-setting
+      leakage, no shared global keys for per-panel controls).
 
 **Capabilities & shipping:**
 
