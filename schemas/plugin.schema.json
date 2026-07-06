@@ -116,22 +116,28 @@
     },
     "capabilities": {
       "type": "object",
-      "description": "Capability declarations keyed by domain. See spec §8.",
+      "description": "Capability declarations keyed by domain. The domain keys and the field vocabulary are open and defined by the declared standard (e.g. capability-pipelines.v1), so additional properties are permitted at both levels. See spec §8.",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": true,
         "properties": {
           "roles": { "type": "array", "items": { "type": "string" } },
+          "operations": { "type": "array", "items": { "type": "string" } },
           "commands": { "type": "array", "items": { "type": "string" } },
+          "requests": { "type": "array", "items": { "type": "string" } },
           "events": { "type": "array", "items": { "type": "string" } },
+          "emits": { "type": "array", "items": { "type": "string" } },
+          "observes": { "type": "array", "items": { "type": "string" } },
           "mode": { "type": "string" },
+          "kind": { "type": "string" },
           "compatibility": {
             "type": "string",
-            "enum": ["none", "shim-allowed", "degrade-noop", "required", "legacy-window-shim"]
+            "description": "How the plugin behaves against an incompatible counterpart. Observed values: none, shim-allowed, degrade-noop, required, legacy-window-shim. Open set — the declared standard may define others, so this is not enumerated as a hard constraint."
           },
           "ownership": { "type": "string" },
           "safety": { "type": "string" },
-          "version": { "type": "integer", "minimum": 1 }
+          "version": { "type": "integer", "minimum": 1 },
+          "description": { "type": "string" }
         }
       }
     }

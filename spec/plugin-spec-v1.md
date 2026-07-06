@@ -325,35 +325,50 @@ it into cross-plugin pipelines (for example, the diagnostics and capability-insp
 
 ```json
 "capabilities": {
-  "diagnostics": {
-    "roles": ["requester", "observer"],
-    "commands": ["snapshot"],
-    "events": [],
+  "audio-input": {
+    "roles": ["provider", "observer"],
+    "operations": ["source.enumerate", "source.open", "source.close"],
+    "events": ["source-registered", "source-selected", "source-opened", "permission-denied"],
     "mode": "active",
     "compatibility": "none",
-    "ownership": "diagnostic-only",
-    "safety": "diagnostic-only",
-    "version": 1
+    "ownership": "multi-provider",
+    "safety": "sensitive",
+    "version": 1,
+    "description": "Provides native desktop audio input devices to the audio-input control plane."
   }
 }
 ```
 
-Recognised fields within a declaration:
+The **domain keys** (`audio-input`, `diagnostics`, `playback`, …) and the field **vocabulary**
+below are **open and defined by the standard the plugin declares** (e.g. `capability-pipelines.v1`),
+not closed by this document. A Host MUST ignore declaration fields it does not recognise, exactly
+as it does for unknown manifest keys ([§4](#4-the-manifest--pluginjson)). The commonly-used fields
+are:
 
-- `roles` — the roles the plugin plays in the domain (e.g. `requester`, `observer`).
-- `commands` — commands the plugin can service.
-- `events` — events the plugin emits.
+- `roles` — the roles the plugin plays in the domain (e.g. `provider`, `observer`, `owner`,
+  `requester`).
+- **Verb/action tokens** the plugin services — one or more of `operations`, `commands`, or
+  `requests` (arrays of string tokens; a domain/standard picks which name it uses).
+- **Event tokens** — arrays of string tokens naming events. `events` and `emits` are events the
+  plugin **emits**; `observes` is events the plugin **observes** (a domain/standard picks which
+  names it uses).
 - `mode` — participation mode (e.g. `active`).
-- `compatibility` — one of `none`, `shim-allowed`, `degrade-noop`, `required`,
-  `legacy-window-shim`.
-- `ownership`, `safety` — domain-specific classification (e.g. `diagnostic-only`).
+- `kind` — a domain-specific classifier for the declaration (e.g. `command`).
+- `compatibility` — how the plugin behaves against an incompatible counterpart; observed values
+  are `none`, `shim-allowed`, `degrade-noop`, `required`, `legacy-window-shim` (open set).
+- `ownership` — the plugin's ownership stance in the domain (e.g. `multi-provider`,
+  `exclusive-owner`, `diagnostic-only`).
+- `safety` — a safety classification for the declaration (e.g. `safe`, `sensitive`,
+  `diagnostic-only`).
 - `version` — the declaration's integer version.
+- `description` — a human-readable description of the declaration.
 
 A disabled plugin contributes nothing to any capability pipeline: the Host MUST treat a disabled
 plugin as declaring no capabilities, regardless of what its manifest says.
 
-Capabilities are an advanced, evolving surface. A plugin that does not participate in a pipeline
-simply omits `capabilities` and `standards`.
+Capabilities are an advanced, evolving surface whose precise semantics live in the capability
+standards, not here. A plugin that does not participate in a pipeline simply omits `capabilities`
+and `standards`.
 
 ---
 

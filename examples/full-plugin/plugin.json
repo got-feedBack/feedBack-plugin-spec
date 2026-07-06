@@ -14,13 +14,14 @@
   "capabilities": {
     "diagnostics": {
       "roles": ["observer"],
-      "commands": ["snapshot"],
+      "operations": ["snapshot"],
       "events": [],
       "mode": "active",
       "compatibility": "none",
       "ownership": "diagnostic-only",
       "safety": "diagnostic-only",
-      "version": 1
+      "version": 1,
+      "description": "Reports its own render state into the diagnostics snapshot."
     }
   }
 }
