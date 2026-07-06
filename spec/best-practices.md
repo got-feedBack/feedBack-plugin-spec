@@ -784,7 +784,7 @@ note changes per version. It costs little and saves every future reader — incl
 
 **Diagnostics:**
 
-- [ ] Client state is contributed via `window.feedBack.diagnostics.contribute(id, payload)` and/or
+- [ ] Client state is contributed via `window.feedBack.diagnostics.contribute("<id>", payload)` and/or
       server state via `diagnostics.server_files` / `diagnostics.callable`.
 - [ ] Contributions carry no secrets/credentials/absolute paths/usernames/raw user content and are
       small (tens of KB), with a `schema`/version field.

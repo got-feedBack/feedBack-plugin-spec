@@ -100,7 +100,7 @@ for how the document, manifest, and per-plugin versions relate.
 - Best-practices guide: added a **"Diagnostics"** section. Covers contributing plugin state to the
   user-exportable diagnostics bundle — **client** via `window.feedBack.diagnostics.contribute(id,
   payload)` (idempotent; last snapshot before export wins) and **server** via `diagnostics.server_files`
-  / `diagnostics.callable` (`"module:function"` returning dict/bytes/str; the Host catches exceptions
+  / `diagnostics.callable` (`"module:function"` returning dict/list/bytes/str; the Host catches exceptions
   so a broken function never crashes the export) — and the rule that a bundle is effectively public,
   so it **MUST NOT contain secrets, credentials, absolute paths, usernames, or raw user content** and
   should stay small with a `schema` field. Added a matching checklist block. Docs only.
