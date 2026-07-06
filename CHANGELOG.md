@@ -45,6 +45,8 @@ for how the document, manifest, and per-plugin versions relate.
   the Host applies each change to the specific per-panel instance) — including the concrete failure
   modes recent fixes addressed (apply-live-not-reload, no cross-setting leakage, deliberate
   per-panel vs global key scoping, fan-out to all panels, settings panel loads before the renderer),
+  and persistence guidance (Host owns persistence — don't hand-roll `localStorage`; if self-managed,
+  stage an in-memory fallback before the quota-fallible `setItem` and keep it off the per-frame path),
   plus the fail-safe auto-revert. Expanded the checklist with a Visualizations block. Docs only.
 
 ## [0.1.0] - 2026-07-05

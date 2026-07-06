@@ -267,6 +267,16 @@ Hard-won rules this replaces — the ways settings communication actually broke:
   `script` runs, so guard any calls into your renderer's globals (`window.myViz && window.myViz…`)
   and let the panel hydrate its own controls from persisted values/defaults independently.
 
+**On persistence and `localStorage`.** Under the `applySetting` contract the **Host owns
+persistence** — declare the setting, apply values live, and let the Host store and replay them.
+Prefer that: do **not** hand-roll settings into `localStorage`, which is what keeps export/import and
+backups whole and stops per-panel copies from drifting. If your plugin nonetheless manages its own
+persistence (a self-managed viz that predates the contract), two rules from the fixes apply:
+`localStorage` is **synchronous and can throw** (quota / private mode), so stage the new value in an
+in-memory fallback **before** the `setItem` and prefer that in-memory value on read — a failed write
+must never leave the renderer showing a stale value while the UI claims the change applied. And
+never touch `localStorage` on a per-frame path (rule 9) — read it once and cache it.
+
 ### 20. Fail safe — the Host reverts a broken renderer
 
 If your `draw()` throws on several consecutive frames the Host automatically reverts to the built-in
@@ -344,6 +354,8 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Canvas size drift is self-detected in `draw()` (don't rely on `resize()` being called).
 - [ ] Settings apply live via `applySetting(key, value)` on the instance (no reload, no cross-setting
       leakage, no shared global keys for per-panel controls).
+- [ ] Persistence is left to the Host (no hand-rolled `localStorage`); if self-managed, writes are
+      quota-safe (in-memory fallback staged before `setItem`) and never on a per-frame path.
 
 **Capabilities & shipping:**
 
