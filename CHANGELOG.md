@@ -27,6 +27,14 @@ for how the document, manifest, and per-plugin versions relate.
   (SHOULD NOT do per-frame DOM/layout/IO; don't observe/mutate the shell — use contribution
   registries; suspend work when hidden; keep state per-instance). Replaces the previous "client
   runtime API is out of scope" placeholder. Settings/Styles/Static-assets renumbered to §6.5–6.7.
+- Best-practices guide: added a **"Client screen & the shared main thread"** section grounded in
+  real feedBack performance regressions — no DOM/layout work on a per-frame path, don't
+  DOM-observe or mutate the app shell (use registration APIs instead of injecting into song/library
+  cards), no synchronous storage/network on hot or gameplay-event paths, idempotent re-hydration
+  (`plugin-runtime-idempotent.v1`), stop work when hidden, stay per-instance, and talk to other
+  plugins through the capability `claim`/`dispatch`/`release` flow rather than their globals.
+  Regrouped the guide (Getting started / Server routes / Client screen / Shipping) and expanded the
+  pre-publish checklist with a client-performance block. Docs only.
 
 ## [0.1.0] - 2026-07-05
 
