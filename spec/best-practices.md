@@ -544,9 +544,65 @@ it's a migration aid, not a contract.
 
 ---
 
+## Server-side robustness
+
+Your `routes` module runs inside the Host's server process, sharing its event loop and startup
+sequence with every other plugin. A slow or misbehaving plugin doesn't just hurt itself — it can
+stall the server or delay every plugin that loads after it. These rules keep a backend plugin a good
+tenant.
+
+### 34. Declare Python dependencies in `requirements.txt` — and keep them light
+
+A plugin's Python dependencies go in a **`requirements.txt`** file in the plugin directory (there is
+no manifest field for this). On first load the Host `pip install`s them into a persistent location
+and adds it to `sys.path`; the install is keyed by a hash of the file, so unchanged requirements
+don't reinstall on later boots.
+
+Two consequences shape good practice:
+
+- **Installs are sequential and can be slow, and they delay *later* plugins.** While your deps
+  install (potentially minutes) your plugin shows as "installing…", and plugins after you in load
+  order wait their turn. Keep the dependency set **small**, prefer wheels, and **pin versions** for
+  reproducibility. Don't pull a huge library for a small need.
+- **A failed install is non-fatal — the Host still tries to load your routes.** So `import` a heavy
+  or optional dependency **defensively** (guard it and degrade if it's missing) rather than assuming
+  it installed; if a genuinely required dep fails, your routes import will fail and the Host shows
+  your plugin as "failed" rather than crashing.
+
+### 35. Don't block the event loop; keep `setup()` fast
+
+The Host calls your `setup(app, context)` on the **server's event-loop thread**, and it is killed if
+it takes too long (on the order of a minute). Do only wiring in `setup()` — register routes, read a
+small config — and defer any heavy work (scanning, model loading, large I/O) to a background task or
+the first request that needs it.
+
+The same discipline applies to your handlers. An `async def` handler that performs **blocking** work
+(synchronous file, network, or CPU-bound work) freezes the whole server for *every* request while it
+runs. Either use non-blocking I/O in an `async def`, or write the handler as a **plain `def`** — the
+Host runs synchronous handlers in a threadpool where blocking is safe.
+
+### 36. Split `routes.py` with `load_sibling`, not bare imports
+
+The Host puts each plugin's directory on `sys.path`, and Python caches modules by bare name in
+`sys.modules` — so if two plugins each ship a top-level `util.py`, whichever loads first wins and the
+other silently gets the wrong module. To split your server code across files, load your own modules
+through **`context["load_sibling"]("name")`**, which imports them under a per-plugin namespace
+(`plugin_<id>.<name>`) so they can't collide, and lets your siblings use relative imports
+(`from .shared import x`). Don't mix a bare `import util` and `load_sibling("util")` for the same
+file — that executes it twice and splits its module-level state.
+
+### 37. Log through `context["log"]`, never `print()`
+
+Use the logger the Host hands you in `context["log"]`. It carries the Host's correlation context and
+lands in the rotated log stream under your plugin's namespace; `print()` bypasses both and is easy to
+lose. (And, per rule 7, mount every route under `/api/plugins/<id>/…` — route paths aren't namespaced
+for you, and a collision with the Host or another plugin is silent and, per rule 6, permanent.)
+
+---
+
 ## Shipping & good citizenship
 
-### 34. Fail soft, log clearly
+### 38. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -555,25 +611,25 @@ it's a migration aid, not a contract.
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 35. Degrade gracefully across Host versions
+### 39. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 36. Only declare capabilities you actually implement
+### 40. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 37. Mind the security boundary
+### 41. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 38. Ship a README and a changelog
+### 42. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -593,6 +649,16 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] `routes.py` does no work at import time; `setup()` validates before registering.
 - [ ] Routes, CSS, and persisted files are namespaced under the `id`.
 - [ ] `version` is set and follows semver.
+
+**Server-side robustness (if you ship `routes`):**
+
+- [ ] Python deps are in `requirements.txt`, pinned and minimal; heavy/optional imports are guarded
+      and degrade if missing.
+- [ ] `setup()` only wires things (fast); no blocking work on the event loop — blocking handlers are
+      plain `def`, not `async def`.
+- [ ] Server code is split via `context["load_sibling"]`, not bare `import`, and routes are
+      namespaced under `/api/plugins/<id>/`.
+- [ ] Logging goes through `context["log"]`, never `print()`.
 
 **Client-screen performance (if you ship a `script`):**
 
