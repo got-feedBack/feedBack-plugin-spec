@@ -13,9 +13,9 @@ with a screen, a settings panel, server routes, and/or a declared capability.
 
 | | |
 |---|---|
-| **Specification version** | 0.1.0 |
+| **Specification version** | 1.0.0 |
 | **Manifest major version** | 1 |
-| **Status** | Draft |
+| **Status** | Stable |
 | **Manifest file** | `plugin.json` |
 
 ## What a plugin looks like

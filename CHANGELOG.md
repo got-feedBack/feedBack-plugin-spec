@@ -9,6 +9,13 @@ for how the document, manifest, and per-plugin versions relate.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-06
+
+First stable release of the feedBack plugin specification. Marks the normative spec and its
+companion best-practices guide (54 rules, ground-truthed against the app) as stable, consolidating
+everything accumulated since the 0.1.0 draft. The version string moves 0.1.0 → 1.0.0 and the
+document status changes from Draft to Stable.
+
 ### Changed
 - §8 (Capabilities) and `schemas/plugin.schema.json` now document the real capability-declaration
   vocabulary, ground-truthed against every bundled plugin: the domain keys and fields are an
@@ -154,5 +161,6 @@ Initial draft of the feedBack plugin specification.
 - Repository governance: README, CONTRIBUTING (DCO + enhancement-proposal process), GOVERNANCE,
   CODE_OF_CONDUCT, issue templates, and AGPL-3.0-only licensing.
 
-[Unreleased]: https://github.com/got-feedback/feedBack-plugin-spec/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/got-feedback/feedBack-plugin-spec/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/got-feedback/feedBack-plugin-spec/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/got-feedback/feedBack-plugin-spec/releases/tag/v0.1.0

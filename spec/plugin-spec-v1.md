@@ -1,8 +1,8 @@
 # feedBack Plugin Specification
 
-- **Specification version:** 0.1.0
+- **Specification version:** 1.0.0
 - **Manifest major version:** 1
-- **Status:** Draft
+- **Status:** Stable
 - **Manifest file:** `plugin.json`
 
 This document defines what a **feedBack plugin** is: the on-disk layout, the `plugin.json`
