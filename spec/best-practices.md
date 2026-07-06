@@ -736,9 +736,10 @@ element named by `selector`. Practical rules:
 ### 46. Only reach for the client tour API when the steps are dynamic
 
 If your steps depend on runtime state (what the user has, which mode is active), register a tour on
-the client instead of shipping static JSON: `window.feedBackTour.register("<id>", { name,
-buildSteps, onStart, onComplete, autoPrompt })`, where `buildSteps` computes the step list when the
-tour starts. Use `autoPrompt` to *offer* the tour on first visit — offer once and remember the
+the client instead of shipping static JSON. The first argument is **your plugin `id`** — the tour is
+keyed by it, so it's namespaced per plugin (rule 2) and can't collide with another plugin's tour:
+`window.feedBackTour.register("my-plugin", { name, buildSteps, onStart, onComplete, autoPrompt })`,
+where `buildSteps` computes the step list when the tour starts. Use `autoPrompt` to *offer* the tour on first visit — offer once and remember the
 answer; don't re-nag on every visit. Static `tour.json` is still the right default; only take on the
 client API when data alone can't express the tour.
 
@@ -752,8 +753,11 @@ your source alongside the built-in local library.
 
 ### 47. Add song sources as a library provider
 
-Register in your `setup()` via `context["register_library_provider"](provider)` and **unregister on
-teardown**. Two things to know:
+Register in your `setup()` via `context["register_library_provider"](provider)`. Keep your
+provider's `id` so you can later call `context["unregister_library_provider"](provider_id)` — there's
+no formal per-plugin teardown callback, so unregister explicitly if you re-register (e.g. on a
+config change) or before replacing a provider, to avoid leaving a stale source registered. Two more
+things to know:
 
 - **Attribution is enforced, not declared.** The Host stamps every provider with *your* plugin as its
   owner — you can't register a provider attributed to another plugin, and the built-in `local`
