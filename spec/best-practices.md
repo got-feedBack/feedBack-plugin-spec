@@ -656,14 +656,53 @@ non-trivial plugin.
 A bundle gets shared with maintainers and is often attached to a public issue. Treat everything you
 contribute as **public**: no tokens, API keys, or credentials; no absolute filesystem paths or
 usernames; no raw audio or other user content. Redact aggressively and keep each contribution small
-(on the order of tens of KB, not megabytes). This is the security boundary (rule 45) applied to
+(on the order of tens of KB, not megabytes). This is the security boundary (rule 48) applied to
 diagnostics — the one place it's easy to leak by accident.
+
+---
+
+## Extending the app's shared surfaces
+
+Rule 10 says *don't* reach into the app's own UI with the DOM — but plugins legitimately need to add
+a button to a song card, a nav entry, a keyboard shortcut, a mixer fader. The Host provides
+**registration APIs** for exactly this: you hand the Host a declaration, and it renders and manages
+your contribution so it survives the app's own re-renders. These are the sanctioned way to extend
+shared surfaces. (All are the current Host contract — feature-detect before relying on one.)
+
+### 42. Add card and nav entries through their registries, not the DOM
+
+- **Song/library card actions.** Register with `window.feedBack.libraryCardActions.register(spec)`,
+  which returns an `unregister()`. The spec is
+  `{ id, pluginId, label, icon?, placement?('menu'|'inline'|'overlay'), order?, destructive?,
+  applies?(song), enabled?(song), run(song, ctx) }`. The library calls `applies`/`enabled` **per
+  card on every render**, so keep them O(1) and allocation-free (rule 10). Duplicate `id`s are
+  rejected.
+- **A navigation entry** is declarative: a `nav` object (`{ label, screen }`) in your `plugin.json`
+  makes the Host add the entry that activates your screen. Prefer this to injecting a nav link
+  yourself.
+
+### 43. Register keyboard shortcuts with a scope, and clean them up
+
+Use `window.registerShortcut({ key, handler, description, scope, condition? })` rather than adding
+your own `keydown` listener (which would fire app-wide and fight other handlers). `scope` limits when
+the shortcut is live — `global`, `player`, `library`, `settings`, or `plugin-<id>` for your own
+screen — so pick the narrowest that fits. Keep the returned handle (or re-use the same scope) and
+**unregister when your screen tears down**, so a stale shortcut doesn't linger.
+
+### 44. Register audio faders through the mixer
+
+If your plugin exposes an audio level the user should control, register it with the mixer —
+`window.feedBack.audio.registerFader(spec)` (`{ id, label, unit?, min, max, step, defaultValue,
+getValue, setValue }`) — instead of building your own slider UI. The Host renders it in the shared
+mixer and calls your `getValue`/`setValue`. The mixer surface may not exist at load, so gate
+registration on the `feedBack:audio:ready` event, and **own your value's persistence** yourself (the
+mixer reflects state, it doesn't store it).
 
 ---
 
 ## Shipping & good citizenship
 
-### 42. Fail soft, log clearly
+### 45. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -672,25 +711,25 @@ diagnostics — the one place it's easy to leak by accident.
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 43. Degrade gracefully across Host versions
+### 46. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 44. Only declare capabilities you actually implement
+### 47. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 45. Mind the security boundary
+### 48. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 46. Ship a README and a changelog
+### 49. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -788,6 +827,14 @@ note changes per version. It costs little and saves every future reader — incl
       server state via `diagnostics.server_files` / `diagnostics.callable`.
 - [ ] Contributions carry no secrets/credentials/absolute paths/usernames/raw user content and are
       small (tens of KB), with a `schema`/version field.
+
+**Extending shared surfaces (if you contribute to app UI):**
+
+- [ ] Card actions via `libraryCardActions.register` (O(1) `applies`/`enabled`), nav via the manifest
+      `nav` key — not DOM injection.
+- [ ] Keyboard shortcuts via `registerShortcut` with the narrowest scope, unregistered on teardown.
+- [ ] Audio levels via `feedBack.audio.registerFader` (gated on `feedBack:audio:ready`); you own
+      persistence.
 
 **Capabilities & shipping:**
 

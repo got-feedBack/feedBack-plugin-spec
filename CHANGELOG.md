@@ -105,6 +105,13 @@ for how the document, manifest, and per-plugin versions relate.
   so it **MUST NOT contain secrets, credentials, absolute paths, usernames, or raw user content** and
   should stay small with a `schema` field. Added a matching checklist block. Docs only.
 
+- Best-practices guide: added an **"Extending the app's shared surfaces"** section — the
+  registration APIs rule 10 points authors to but never named. Covers **song/library card actions**
+  (`window.feedBack.libraryCardActions.register(spec)` with `applies`/`enabled`/`run`), **nav entries**
+  (the manifest `nav` key), **keyboard shortcuts** (`window.registerShortcut` with scoped lifetimes,
+  cleaned up on teardown), and **audio faders** (`window.feedBack.audio.registerFader`, gated on
+  `feedBack:audio:ready`, plugin owns persistence). Added a matching checklist block. Docs only.
+
 ## [0.1.0] - 2026-07-05
 
 Initial draft of the feedBack plugin specification.
