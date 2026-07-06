@@ -75,7 +75,7 @@ tuner/                     # directory name == manifest "id"
 
 Only `plugin.json` is REQUIRED. Every other file exists **because the manifest points at it**;
 a file present but not referenced from the manifest is ignored by the Host (though it MAY still
-be served as a static asset — see [§6.4](#64-static-assets)).
+be served as a static asset — see [§6.7](#67-static-assets)).
 
 File and directory names inside a plugin SHOULD be lowercase with `-` or `_` separators. The
 directory name (the `id`) MUST match `^[a-z0-9][a-z0-9_-]*$` (see [§4.2](#42-id)).
@@ -234,29 +234,124 @@ disabled because doing so would break core surfaces.
 
 ## 6. Client surface
 
-### 6.1. Screen
+A plugin with a `script` and/or `screen` contributes a navigable screen that runs in the app's
+renderer. This section pins the **portable, stable** rules a screen must follow
+([§6.4](#64-performance-and-the-shared-main-thread) especially), and describes the current
+**Host-provided runtime surface** ([§6.3](#63-the-client-runtime-surface)) — which is versioned by
+the Host and is **not** frozen by this specification version.
 
-A plugin with a `script` and/or `screen` contributes a navigable screen. The Host adds a
-navigation entry (labelled by `name`, iconed by `icon`) that activates the screen.
+### 6.1. Screen mount lifecycle
 
-`script` is loaded as a client-side JavaScript module. The runtime API available to that
-module (how it mounts, reads settings, and talks to its own `routes`) is provided by the Host and
-is **out of scope for this version of the spec** — it is documented by the Host's own developer
-docs and is evolving. A future version of this spec SHOULD pin that API. Until then, a plugin
-targeting a specific Host version SHOULD record which Host runtime it was written against.
+The mount **mechanism** is defined and versioned by the Host, not by this document; the mechanics
+below describe the current Host and are given so plugin authors can reason about lifecycle and
+idempotence. What is **normative and stable** is the idempotence requirement at the end of this
+section.
 
-### 6.2. Settings panel
+For each ready plugin that declares a `screen`, the Host:
+
+1. creates a container element it owns — currently a `<div class="screen">` with a deterministic,
+   `id`-derived identifier (of the form `plugin-<id>`) — and inserts it into the app shell;
+2. sets that container's markup from the plugin's `screen` file;
+3. loads the plugin's `script` and executes it once.
+
+There is **no Host-invoked entry point**: the Host does not call a `mount()`, `init()`, or
+`render()` export. A plugin's `script` is a self-executing module that runs on load, wires up its
+own behaviour, and finds its own DOM by the identifiers the plugin authored inside its `screen`
+markup. A plugin therefore SHOULD namespace those identifiers under its `id` so they don't collide
+with the Host's or another plugin's — every plugin shares one document.
+
+**Re-hydration (normative).** The Host MAY execute a plugin's `script` more than once in a session
+— for example when the plugin set reloads. A plugin's `script` **MUST** be idempotent: a second
+(or later) execution MUST NOT install a second copy of any listener, timer, observer, DOM subtree,
+capability participant, or wrapped Host function. The established pattern is a guard on a
+well-known global: a second run refreshes its implementation but installs shared listeners, timers,
+and wrappers only once. This suppresses duplicate **global** side effects from re-execution; it is
+distinct from **per-screen-instance** state, which [§6.4](#64-performance-and-the-shared-main-thread)
+says to keep per instance (the Host may mount several instances of a screen at once). A plugin that
+declares the `plugin-runtime-idempotent.v1` standard (see [§8](#8-capabilities-and-standards))
+asserts exactly this property and MUST honour it.
+
+### 6.2. Screen activation and visibility
+
+A plugin's screen is not always visible. The Host activates exactly one screen at a time and
+signals the transition; the current Host expresses activation by toggling an `active` class on the
+screen container and emitting a `screen:changed` event (carrying the activated screen's id) on its
+client event bus ([§6.3](#63-the-client-runtime-surface)).
+
+A plugin SHOULD react to activation/deactivation rather than assuming it is always on screen, and
+SHOULD suspend background work (animation loops, high-frequency subscriptions) while its screen is
+not active — see [§6.4](#64-performance-and-the-shared-main-thread).
+
+### 6.3. The client runtime surface
+
+Beyond mounting a screen, the Host exposes a runtime surface a plugin MAY use. **This surface is
+provided and versioned by the Host, and is not frozen by this specification version.** It is
+described here so authors know what exists and how stable each part is; a future version of this
+spec MAY pin parts of it normatively. There is no single global "Host version" — individual runtime
+objects each carry their own `version` sentinel, and a plugin SHOULD feature-detect (check that an
+object and its `version` exist) rather than assume.
+
+The current surface has three tiers:
+
+- **A client event bus** — a Host object (an `EventTarget`) offering `on` / `off` / `emit`, plus
+  live state and transport helpers. The Host emits lifecycle events over it (screen activation,
+  song load/ready, playback transport, position, library change). A plugin subscribes to react to
+  app state. **Stable but general** — treat unknown events as optional.
+- **Contribution registries** — Host APIs through which a plugin *registers* a contribution to a
+  shared surface instead of mutating the shell's DOM (for example, registering a library-card
+  action, or a renderer factory for a visualization). Using these is strongly preferred over
+  reaching into shell DOM (see [§6.4](#64-performance-and-the-shared-main-thread)).
+- **The capability control plane** — the versioned `claim` / `dispatch` / `release` /
+  `registerParticipant` surface described in [§8](#8-capabilities-and-standards). This is the
+  **forward-stable, explicitly-versioned** surface (`capability-pipelines.v1`) and is the preferred
+  way for a plugin to drive or observe another plugin or a shared subsystem.
+
+The current Host also exposes a set of **legacy global functions** (navigation, playback, and
+library actions). These are **supported but legacy** — the Host is migrating them behind the
+capability control plane. A plugin SHOULD prefer the capability surface and the contribution
+registries over calling legacy globals, and MUST NOT assume any legacy global exists without
+feature-detecting it.
+
+### 6.4. Performance and the shared main thread
+
+A plugin's `script` runs, unsandboxed, on the app's **shared main thread** — the same thread as a
+real-time render loop that draws the note highway at up to ~60 frames per second and mutates the
+DOM many times per second during playback. Main-thread time a plugin spends is time the render loop
+does not have. Accordingly:
+
+- A plugin **SHOULD NOT** perform DOM queries (`querySelector` / `querySelectorAll`), layout reads
+  (`getBoundingClientRect`, `offsetWidth`/`offsetHeight`), or style writes on a **per-frame or
+  high-frequency path** — inside a `requestAnimationFrame` loop, a render/`draw` callback, a short
+  `setInterval`, or a `MutationObserver` callback. A plugin SHOULD resolve the elements it needs
+  once, when its screen mounts, cache those references, and re-resolve only when a cached node has
+  actually detached.
+- A plugin **SHOULD NOT** observe or mutate the app shell's DOM (for example the song/library cards
+  or the navigation bar) directly, and MUST NOT install a subtree `MutationObserver` on a shared
+  container. To contribute UI to a shared surface, a plugin SHOULD use the Host's contribution
+  registries ([§6.3](#63-the-client-runtime-surface)).
+- A plugin **SHOULD NOT** perform synchronous storage (e.g. `localStorage`), blocking I/O, or
+  network I/O on a per-frame path or in a handler for a high-frequency or gameplay event.
+- A plugin **SHOULD** suspend animation loops and high-frequency subscriptions while its screen is
+  not active ([§6.2](#62-screen-activation-and-visibility)), and **SHOULD** keep screen state
+  per-instance rather than in module-level globals, because the Host MAY mount more than one
+  instance of a screen at once (e.g. splitscreen), even though only one screen is *active* at a time
+  ([§6.2](#62-screen-activation-and-visibility)).
+
+These rules are portable and stable regardless of how the Host's runtime API evolves. The
+non-normative [best-practices guide](best-practices.md) expands on them with examples.
+
+### 6.5. Settings panel
 
 When `settings.html` is declared, the Host renders it as the plugin's settings panel, grouped by
 `settings.category`. Settings values a plugin persists are stored by the Host, keyed under the
 plugin `id`.
 
-### 6.3. Styles
+### 6.6. Styles
 
 When `styles` is declared, the Host applies that CSS while the plugin's screen is active. Plugin
 CSS SHOULD be scoped to the plugin's own DOM to avoid leaking styles into the rest of the app.
 
-### 6.4. Static assets
+### 6.7. Static assets
 
 The Host MAY serve files inside a plugin directory as static assets (images, audio, fonts). A
 plugin MUST NOT rely on any file *outside* its own directory being served, and MUST NOT assume a
