@@ -630,9 +630,40 @@ run its build to produce your own sheet; ship the compiled output, not a config.
 
 ---
 
+## Diagnostics
+
+When something goes wrong, a user can export a **diagnostics bundle** and send it to whoever's
+helping. A plugin can add its own state to that bundle — which is the difference between a bug report
+you can act on and one you can only guess at. Contributing diagnostics is cheap and worth it for any
+non-trivial plugin.
+
+### 40. Make your plugin debuggable — contribute diagnostics
+
+- **Client state.** Call `window.feedBack.diagnostics.contribute("<id>", payload)` to push whatever
+  would help you debug — the active mode, the last input, internal counters, the last error. It's
+  idempotent (each call overwrites the previous), so just re-contribute a fresh snapshot whenever your
+  state changes; whatever you contributed last before the export is what lands in the bundle under
+  your plugin.
+- **Server state.** In your manifest's `diagnostics`, list `server_files` (files under your
+  `config_dir` to include verbatim) and/or a `callable` (`"module:function"`) that returns a snapshot
+  (a `dict`/`list`, `bytes`, or `str`). The Host resolves the callable lazily at export time and
+  **catches any exception** into the bundle's notes, so a broken diagnostics function never crashes
+  the export — but return something small and useful, and embed a `schema`/version field so a reader
+  can tell what they're looking at.
+
+### 41. Never put secrets in a diagnostics bundle
+
+A bundle gets shared with maintainers and is often attached to a public issue. Treat everything you
+contribute as **public**: no tokens, API keys, or credentials; no absolute filesystem paths or
+usernames; no raw audio or other user content. Redact aggressively and keep each contribution small
+(on the order of tens of KB, not megabytes). This is the security boundary (rule 45) applied to
+diagnostics — the one place it's easy to leak by accident.
+
+---
+
 ## Shipping & good citizenship
 
-### 40. Fail soft, log clearly
+### 42. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -641,25 +672,25 @@ run its build to produce your own sheet; ship the compiled output, not a config.
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 41. Degrade gracefully across Host versions
+### 43. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 42. Only declare capabilities you actually implement
+### 44. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 43. Mind the security boundary
+### 45. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 44. Ship a README and a changelog
+### 46. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -750,6 +781,13 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Any wrapped Host function calls + `await`s the original, installs once, and cleans up; no
       load-order assumptions.
 - [ ] Player-injecting plugins work in both `v2` and `v3` (mount into the Host slot).
+
+**Diagnostics:**
+
+- [ ] Client state is contributed via `window.feedBack.diagnostics.contribute("<id>", payload)` and/or
+      server state via `diagnostics.server_files` / `diagnostics.callable`.
+- [ ] Contributions carry no secrets/credentials/absolute paths/usernames/raw user content and are
+      small (tens of KB), with a `schema`/version field.
 
 **Capabilities & shipping:**
 
