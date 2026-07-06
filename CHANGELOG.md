@@ -112,6 +112,15 @@ for how the document, manifest, and per-plugin versions relate.
   cleaned up on teardown), and **audio faders** (`window.feedBack.audio.registerFader`, gated on
   `feedBack:audio:ready`, plugin owns persistence). Added a matching checklist block. Docs only.
 
+- Best-practices guide: added **"Onboarding tours"** and **"Library providers"** sections, the
+  last of the extension points a completeness sweep found. Tours: any plugin can ship a guided tour
+  as a declarative `tour.json` (a `tour` manifest key; steps are centered `bubble`s or element
+  `spotlight`s with `selector`/`waitFor`), with the client `window.feedBackTour.register(...)` API
+  reserved for dynamic steps and offering the tour once. Library providers: add song sources via
+  `context["register_library_provider"]` (unregister on teardown; the Host enforces owner attribution
+  and the built-in `local` provider can't be removed; declare the `library` capability and page large
+  sources). Added matching checklist items. Docs only.
+
 ## [0.1.0] - 2026-07-05
 
 Initial draft of the feedBack plugin specification.
