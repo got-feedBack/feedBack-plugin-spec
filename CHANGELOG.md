@@ -49,6 +49,16 @@ for how the document, manifest, and per-plugin versions relate.
   stage an in-memory fallback before the quota-fallible `setItem` and keep it off the per-frame path),
   plus the fail-safe auto-revert. Expanded the checklist with a Visualizations block. Docs only.
 
+- Best-practices guide: expanded the `id`/naming rule (rule 2) with the collision and namespacing
+  gotchas, ground-truthed against the loader. Explains how far the `id` reaches (routes module
+  `plugin_<id>_routes`, screen container `plugin-<id>`, viz global `window.feedBackViz_<id>`,
+  diagnostics path, `localStorage` prefix), the exact-case folder rule and why the charset matters
+  (it becomes a Python module + DOM/JS identifiers), the **collision resolution** (a bundled `id`
+  always wins — a user plugin reusing it is silently ignored; between two non-bundled plugins the
+  first discovered wins), **reserved ids** (`capability_inspector`, `app_tour_*` are always-enabled),
+  and namespacing shared-space names (`localStorage`, `window` globals, routes, CSS) by `id`. Added
+  matching checklist items. Docs only.
+
 ## [0.1.0] - 2026-07-05
 
 Initial draft of the feedBack plugin specification.

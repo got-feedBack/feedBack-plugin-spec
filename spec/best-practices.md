@@ -24,12 +24,48 @@ Get *that* discovered first (folder name equal to `id`, dropped into a plugins d
 add one surface at a time — a screen, then settings, then routes. Adding surfaces incrementally
 means when something stops loading you know exactly which change caused it.
 
-### 2. Treat the `id` as forever
+### 2. Choose the `id` carefully — it's a permanent, far-reaching identifier
 
-The `id` keys your settings store, your routes namespace, and your capability declarations.
-Renaming it silently orphans every user's saved settings. Pick a lowercase, `-`/`_`-separated,
-descriptive `id` once (`drum_highway_3d`, not `dh3` or `DrumHighway`) and never change it. The
-folder name must match it exactly.
+Your `id` is not just a label; the Host derives a surprising amount of machinery from it. It keys
+the settings store, the routes namespace, and the capability participant, and it is interpolated
+into names all over the app: the server routes module (`plugin_<id>_routes`), the screen container
+element (`plugin-<id>`), a visualization's factory global (`window.feedBackViz_<id>`), the
+diagnostics path (`plugins/<id>/`), and the conventional `localStorage` prefix. A collision or a
+rename therefore ripples through all of them at once.
+
+So:
+
+- **Pick it once and never change it.** Renaming an `id` silently orphans every user's saved
+  settings and breaks every derived name above. Changing the `id` is a *new* plugin, not a new
+  version (see [spec §4.2](plugin-spec-v1.md#42-id)).
+- **Make it specific and unique.** Prefer a descriptive `id` (`drum_highway_3d`, not `dh3` or a
+  generic `player`/`viz`). A generic `id` is the easiest way to collide with someone else's plugin.
+- **The folder name MUST equal the `id`, exactly, including case.** A folder named `Tuner` or
+  `tuner-plugin` holding `{"id": "tuner"}` is simply not discovered — the most common "why won't my
+  plugin load?" (see [spec §5.2](plugin-spec-v1.md#52-the-directory-name-rule)).
+- **Stick to `^[a-z0-9][a-z0-9_-]*$` (lowercase, with `-` or `_` separators — both are fine and
+  both are used in practice).** The charset isn't
+  cosmetic: the `id` is spliced into a Python module name and DOM/JS identifiers. Uppercase breaks
+  the exact-match discovery rule, and dots/spaces/other punctuation break module or element naming.
+  The reference validator rejects anything outside this set — run it (`python tools/validate.py`).
+
+**Collisions with an existing plugin.** When two plugins share an `id`, only one loads, and the
+rule is not "last one wins":
+
+- A **bundled** (first-party) plugin **always wins** — a plugin you install that reuses a bundled
+  `id` is silently ignored (the Host keeps it only as a fallback if the bundled copy fails). Before
+  naming a plugin, make sure the `id` isn't already a bundled one.
+- Between two non-bundled plugins, the first the Host discovers wins and the other is dropped — so a
+  duplicate `id` means one of them silently doesn't load.
+
+**Reserved ids.** Do not name a plugin `capability_inspector`, or use an `app_tour_` prefix, unless
+you intend to replace those core surfaces — the Host treats them as always-enabled (they cannot be
+disabled), so a collision there is especially sticky.
+
+**Namespace what the `id` doesn't namespace for you.** Because every plugin shares one `window` and
+one document, prefix anything you put in a shared space with your `id`: `localStorage` keys, any
+`window` globals you must expose, your routes (`/api/plugin/<id>/…`, rule 7), and your CSS (rule 10).
+Two plugins writing `window.state` or `localStorage["theme"]` clobber each other silently.
 
 ### 3. Keep the manifest declarative
 
@@ -323,7 +359,11 @@ note changes per version. It costs little and saves every future reader — incl
 
 ## Checklist before you publish
 
-- [ ] Folder name equals `id`, matching `^[a-z0-9][a-z0-9_-]*$`.
+- [ ] Folder name equals `id` exactly (incl. case), matching `^[a-z0-9][a-z0-9_-]*$`.
+- [ ] `id` is specific and doesn't collide with a bundled plugin (a bundled `id` wins; yours would be
+      silently ignored) or a reserved one (`capability_inspector`, `app_tour_*`).
+- [ ] Global namespaces are prefixed by `id`: `localStorage` keys and any `window` globals. (Routes
+      and CSS are covered separately below.)
 - [ ] `plugin.json` is valid against [`schemas/plugin.schema.json`](../schemas/plugin.schema.json)
       (`python tools/validate.py path/to/my-plugin`).
 - [ ] Every manifest file reference resolves to a shipped file.
