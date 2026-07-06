@@ -131,10 +131,12 @@ So:
 - Keep any predicate the Host calls per item (e.g. "does this card-action apply to this song?")
   **O(1) and allocation-free** — it runs once per visible card on every re-render.
 
-### 11. No synchronous network or storage on a hot or fan-out path
+### 11. No synchronous storage or awaited I/O on a hot or fan-out path
 
-`localStorage` is synchronous; `fetch`/`await` stalls your handler on I/O. Neither belongs in a
-handler that fires per note, per frame, or on a high-frequency event. The worst offender is doing
+`localStorage` is synchronous — it blocks the main thread while it runs. `fetch` is asynchronous,
+but *awaiting* a network round-trip inside a hot handler still stalls that handler on I/O. Neither
+a synchronous `localStorage` call nor an awaited `fetch` belongs in a handler that fires per note,
+per frame, or on a high-frequency event. The worst offender is doing
 this in response to a gameplay event (a song-complete / score event can arrive at the exact moment
 the frame budget is tightest). Read settings once on mount and cache them; debounce writes to an
 idle callback or a single `requestAnimationFrame`.
@@ -229,7 +231,8 @@ note changes per version. It costs little and saves every future reader — incl
       `setInterval`, or `MutationObserver` callbacks — element refs resolved once on mount.
 - [ ] No `MutationObserver` on a shared shell container with `subtree: true`; shell UI contributed
       via registration APIs, not DOM injection.
-- [ ] No synchronous `localStorage` or `await fetch` on a per-frame / per-note / gameplay-event path.
+- [ ] No synchronous `localStorage`, and no awaited `fetch`/network I/O, on a per-frame / per-note /
+      gameplay-event path.
 - [ ] Re-running `script` is a no-op (idempotent hydration) if you declare
       `plugin-runtime-idempotent.v1`.
 - [ ] rAF loops and event subscriptions stop when the screen is hidden; state is per-instance.
