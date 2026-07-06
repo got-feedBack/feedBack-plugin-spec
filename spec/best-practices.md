@@ -600,9 +600,39 @@ for you, and a collision with the Host or another plugin is silent and, per rule
 
 ---
 
+## Styling
+
+The app's own compiled stylesheet only contains the utility classes the bundled code happens to use.
+A plugin installed at runtime (from the plugin manager, a shared folder, the community) cannot rely
+on it — any class the app doesn't already use simply won't exist, and the plugin renders unstyled.
+So a plugin owns its own styling.
+
+### 38. Ship your own compiled stylesheet via `styles`
+
+Declare a `styles` entry pointing to a **compiled** CSS file (under `assets/`, per rule 28) and put
+every class your screen needs in it. Don't assume a utility class exists just because the app uses a
+similar one — especially arbitrary-value utilities like `w-[37px]` or `bg-slate-800/50`, which are
+generated on demand and are almost never in the app's sheet. If you author with a utility framework,
+run its build to produce your own sheet; ship the compiled output, not a config.
+
+### 39. Build it to coexist — no global resets, no CDN, cache-busted
+
+- **Turn off the global reset.** Build your stylesheet with the framework's base/preflight reset
+  **disabled** (e.g. Tailwind's `corePlugins.preflight = false`). A plugin sheet that ships a full CSS
+  reset re-styles the entire app, not just your screen.
+- **Keep it scoped.** Namespace selectors under your screen's root (rule 10) so your rules don't leak
+  outward — the flip side of the reset rule.
+- **Never load a runtime CSS engine or CDN.** Don't pull the Tailwind Play CDN or any in-browser
+  CSS-in-JS/JIT: it's slow, it's unavailable offline (feedBack runs local-first), and it recompiles on
+  the main thread. Compile ahead of time and ship the result.
+- **Bump your `version` when the stylesheet changes.** The Host cache-busts your assets by plugin
+  version, so a stale sheet keeps serving until you bump (rule 4).
+
+---
+
 ## Shipping & good citizenship
 
-### 38. Fail soft, log clearly
+### 40. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -611,25 +641,25 @@ for you, and a collision with the Host or another plugin is silent and, per rule
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 39. Degrade gracefully across Host versions
+### 41. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 40. Only declare capabilities you actually implement
+### 42. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 41. Mind the security boundary
+### 43. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 42. Ship a README and a changelog
+### 44. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -659,6 +689,13 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Server code is split via `context["load_sibling"]`, not bare `import`, and routes are
       namespaced under `/api/plugins/<id>/`.
 - [ ] Logging goes through `context["log"]`, never `print()`.
+
+**Styling (if your screen has custom CSS):**
+
+- [ ] A compiled stylesheet ships via `styles`, containing every class the screen uses (no reliance
+      on the app's sheet).
+- [ ] Built with the base/preflight reset off and selectors scoped to your screen; no Tailwind Play
+      CDN or runtime CSS engine; `version` bumped when the sheet changes.
 
 **Client-screen performance (if you ship a `script`):**
 

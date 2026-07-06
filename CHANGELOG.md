@@ -91,6 +91,12 @@ for how the document, manifest, and per-plugin versions relate.
   code via `context["load_sibling"]`** rather than bare imports that collide across plugins in
   `sys.modules`, and **logging through `context["log"]` (never `print()`)** plus route namespacing.
   Added a matching checklist block. Docs only.
+- Best-practices guide: added a **"Styling"** section. A plugin can't rely on the app's compiled
+  stylesheet (it only contains classes the bundled code uses), so a runtime-installed plugin renders
+  unstyled unless it **ships its own compiled stylesheet via `styles`**. Covers building it to
+  coexist — base/preflight reset **off**, selectors scoped, **no Tailwind Play CDN / runtime CSS
+  engine** (slow, offline-hostile), and bump `version` to cache-bust the sheet. Added a matching
+  checklist block. Docs only.
 
 ## [0.1.0] - 2026-07-05
 
