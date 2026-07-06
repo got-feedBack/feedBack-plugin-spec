@@ -620,7 +620,7 @@ run its build to produce your own sheet; ship the compiled output, not a config.
 - **Turn off the global reset.** Build your stylesheet with the framework's base/preflight reset
   **disabled** (e.g. Tailwind's `corePlugins.preflight = false`). A plugin sheet that ships a full CSS
   reset re-styles the entire app, not just your screen.
-- **Keep it scoped.** Namespace selectors under your screen's root (rule 10) so your rules don't leak
+- **Keep it scoped.** Scope selectors under your screen's root (rule 7) so your rules don't leak
   outward — the flip side of the reset rule.
 - **Never load a runtime CSS engine or CDN.** Don't pull the Tailwind Play CDN or any in-browser
   CSS-in-JS/JIT: it's slow, it's unavailable offline (feedBack runs local-first), and it recompiles on
