@@ -656,7 +656,7 @@ non-trivial plugin.
 A bundle gets shared with maintainers and is often attached to a public issue. Treat everything you
 contribute as **public**: no tokens, API keys, or credentials; no absolute filesystem paths or
 usernames; no raw audio or other user content. Redact aggressively and keep each contribution small
-(on the order of tens of KB, not megabytes). This is the security boundary (rule 51) applied to
+(on the order of tens of KB, not megabytes). This is the security boundary (rule 53) applied to
 diagnostics — the one place it's easy to leak by accident.
 
 ---
@@ -769,9 +769,51 @@ things to know:
 
 ---
 
+## Highway overlays and note-state providers
+
+The Visualizations section covers *replacing* the note-highway renderer. Two other surfaces let a
+plugin participate in the highway without replacing it: **overlays** draw a layer on top of whatever
+renderer is active, and a **note-state provider** feeds per-note judgment into the active renderer.
+Both are the current Host contract.
+
+### 48. Decorate the highway with an overlay, not a renderer
+
+An overlay is a layer *on top of* whichever renderer the user has picked — it decorates rather than
+replaces, so several can stack (a fretboard, chord labels, practice feedback) without fighting over
+the canvas. An overlay does **not** set `"type": "visualization"` and does **not** appear in the viz
+picker (it's typically a navbar toggle). Building one:
+
+- **Own your own `requestAnimationFrame` loop and canvas.** Don't piggyback on the highway's draw
+  hooks or rendering context — they fire for the built-in 2D renderer and for custom renderers that
+  opt in, but not universally.
+- **Re-read state every frame.** Your output must track whatever the active renderer is drawing;
+  don't cache note positions across frames.
+- **Respect the lefty and invert toggles** — if you depict strings or frets, mirror with the same
+  transforms the active renderer uses.
+- **Gate 2D-geometry helpers on the default renderer.** If you position with the built-in highway's
+  geometry helpers (`highway.project` / `highway.fretX`), guard on `highway.isDefaultRenderer()` —
+  those coordinates describe the built-in 2D highway and won't match a custom 3D/piano scene, so skip
+  drawing when it returns false. Renderer-agnostic overlays (that use `getNotes()` /
+  `getChordTemplates()` and their own layout) don't need the guard.
+- **Track highway visibility if you mount your own DOM.** Listen for the `highway:visibility`
+  (`{ visible, canvas }`) event and hide/show your overlay canvas to match — while the highway is
+  hidden the Host skips its draw, but your sibling DOM won't hide itself. Cancel your rAF and hide
+  your canvas when the overlay is toggled off.
+
+### 49. Light up notes through the note-state provider
+
+If your plugin *judges* playing (a scorer/note detector) and wants the highway to reflect it, don't
+float your own ring near each note — publish per-note judgment through
+`highway.setNoteStateProvider(fn)`. The **active renderer** then lights the note gem itself on a
+correct hit and keeps a sustain trail glowing while it's held, whichever renderer is in use. It's a
+**single global surface** — one provider at a time — so clear it (`setNoteStateProvider(null)`) when
+your plugin stops, and don't assume you're the only one that might want it.
+
+---
+
 ## Shipping & good citizenship
 
-### 48. Fail soft, log clearly
+### 50. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -780,25 +822,25 @@ things to know:
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 49. Degrade gracefully across Host versions
+### 51. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 50. Only declare capabilities you actually implement
+### 52. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 51. Mind the security boundary
+### 53. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 52. Ship a README and a changelog
+### 54. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -861,6 +903,14 @@ note changes per version. It costs little and saves every future reader — incl
       leakage, no shared global keys for per-panel controls).
 - [ ] Persistence is left to the Host (no hand-rolled `localStorage`); if self-managed, writes are
       quota-safe (in-memory fallback staged before `setItem`) and never on a per-frame path.
+
+**Highway overlays / note providers (if applicable):**
+
+- [ ] An overlay owns its own rAF + canvas, re-reads state each frame, gates `project`/`fretX` on
+      `isDefaultRenderer()`, tracks `highway:visibility`, and cleans up on toggle-off — and does not
+      set `type: "visualization"`.
+- [ ] A scorer lights notes via `highway.setNoteStateProvider(fn)` (single global; cleared on stop),
+      not a floating overlay.
 
 **Minigames (if you register into the `minigames` host):**
 
