@@ -471,9 +471,82 @@ function loadScriptOnce(src) {
 
 ---
 
+## Integrating with the app
+
+Beyond mounting a screen, most plugins need to *react to* and *drive* the app — react to the song
+that's playing, navigate, control the transport. The Host exposes this through the `window.feedBack`
+object; reach for it rather than the app's own DOM. (As with the rest of the client runtime surface,
+these names are the current Host contract, versioned by the Host — feature-detect before you rely on
+one.)
+
+### 30. Subscribe to app state through the event bus
+
+`window.feedBack` is an event bus: `on(event, fn)`, `off(event, fn)`, and `emit(event, detail)`. The
+Host emits lifecycle events over it and you subscribe to react; the payload rides on `event.detail`.
+The commonly-used events:
+
+| Event | `event.detail` | Fires when |
+|---|---|---|
+| `screen:changed` | `{ id }` | The active screen changes (your screen becoming visible/hidden). |
+| `song:loading` / `song:ready` | song info | A song starts loading / is ready to play. |
+| `song:play` / `song:resume` / `song:pause` / `song:stop` / `song:ended` | — | Transport state changes. |
+| `song:seek` / `song:position-changed` | `{ time, duration }` | The playhead moves. |
+| `song:arrangement-changed` | arrangement | The user switches arrangement. |
+| `library:changed` | `{ reason }` | The song library is rescanned/updated. |
+| `viz:renderer:ready` / `viz:reverted` | `{ reason }` on revert | A visualization renderer starts / auto-reverts. |
+| `highway:canvas-replaced` / `highway:visibility` | `{ … }` | The highway canvas is swapped / shown or hidden. |
+
+Treat any event you don't recognise as optional (the set grows over time), keep handlers cheap (some
+fire during playback — see rule 9), and **unsubscribe when your screen is hidden or torn down**
+(rule 13) so a background plugin isn't doing work on every transport tick.
+
+### 31. Drive the app through the `feedBack` API, not its DOM
+
+To navigate, play, or control playback, call the Host API — never click or mutate the app's own
+controls (`document.querySelector('#btn-loop-…')` and friends are private and move between UI
+versions). The surface comes in two forms; **feature-detect** whichever one you call before relying
+on it:
+
+- **On the `window.feedBack` object:** `feedBack.navigate(screenId, params)` and
+  `feedBack.getNavParams()`, `feedBack.seek(seconds, reason)`, `feedBack.setLoop(a, b)` /
+  `feedBack.clearLoop()` / `feedBack.getLoop()`, and the live read-only state `feedBack.currentSong`
+  / `feedBack.isPlaying`.
+- **Legacy top-level globals** (supported but being migrated behind `feedBack`, per rule 32's
+  caution about the surface): `window.showScreen(id)`, `window.playSong(...)`,
+  `window.setReturnScreen(id)`, and the `window.feedBack.playQueue` queue API. Prefer the
+  `feedBack`-namespaced call where one exists.
+
+Going through the API keeps you working when the app's markup changes and avoids fighting the Host
+for control of the transport.
+
+### 32. Wrap Host functions carefully — call through, stay idempotent, clean up
+
+A common pattern is wrapping a Host global like `playSong` or `showScreen` to run your own logic
+around it. Do it defensively:
+
+- **Always call — and `await` — the original.** Capture it, invoke it, return its result. Swallowing
+  it breaks playback/navigation for the whole app and every other plugin in the wrapper chain.
+- **Install the wrapper once.** Store it behind a stable singleton (rule 12) so re-hydration doesn't
+  stack wrapper-on-wrapper.
+- **Undo what a transition invalidates.** If you wrap `showScreen`, tear down your player-screen hooks
+  when the user navigates away.
+- **Don't assume load order.** Plugins load alphabetically, so a Host global or another plugin's API
+  may not exist yet when your `script` runs — check for it at the moment you *use* it (or on the
+  relevant event), not at load time.
+
+### 33. Support both player UIs
+
+feedBack has two player chromes (`v2` and `v3`). A plugin that injects controls into the player MUST
+work in both: detect the active one (the Host exposes a `uiVersion` and a `v3` mount point such as
+`ui.playerControlSlot()`), mount into the Host-provided slot rather than a hard-coded container, and
+verify your plugin in **both** UIs before shipping. Don't rely on any backward-compatibility shim —
+it's a migration aid, not a contract.
+
+---
+
 ## Shipping & good citizenship
 
-### 30. Fail soft, log clearly
+### 34. Fail soft, log clearly
 
 - Use `context["log"]` (server) so your messages land in the Host log under your plugin's
   namespace.
@@ -482,25 +555,25 @@ function loadScriptOnce(src) {
 - If a surface can't initialise, degrade to a reduced-but-working state rather than taking the
   whole plugin down.
 
-### 31. Degrade gracefully across Host versions
+### 35. Degrade gracefully across Host versions
 
 A plugin may run on a Host older than the one you developed against. Don't assume a `context` key
 or a client runtime API exists without a documented Host version guaranteeing it. If an optional
 surface isn't supported, your plugin's other surfaces must still work.
 
-### 32. Only declare capabilities you actually implement
+### 36. Only declare capabilities you actually implement
 
 `capabilities` and `standards` wire you into cross-plugin pipelines (diagnostics, capability
 inspection). Declaring a capability you don't service registers a phantom participant and breaks
 the pipeline. If you don't participate, omit both keys entirely.
 
-### 33. Mind the security boundary
+### 37. Mind the security boundary
 
 Your `routes` run arbitrary Python in the server process and your `script` runs in the app's
 renderer. Validate every route input, don't shell out on user data, and don't reach outside your
 plugin directory. Users installing your plugin are trusting it like an app extension — earn it.
 
-### 34. Ship a README and a changelog
+### 38. Ship a README and a changelog
 
 A plugin folder should carry a short `README.md` (what it does, which Host version it targets) and
 note changes per version. It costs little and saves every future reader — including you.
@@ -564,6 +637,16 @@ note changes per version. It costs little and saves every future reader — incl
 - [ ] Split files share state via a bracket-keyed `window["<id>"]` namespace (classic script — no
       `import`/`export` or top-level `await` in `screen.js`).
 - [ ] Runtime loads are de-duped so re-hydration doesn't load them twice.
+
+**Integrating with the app:**
+
+- [ ] React to app state via the `window.feedBack` event bus; handlers are cheap and unsubscribe
+      when hidden.
+- [ ] Navigation/playback goes through the `feedBack` API (`navigate`, `playSong`, `setLoop`, …),
+      never the app's own DOM controls.
+- [ ] Any wrapped Host function calls + `await`s the original, installs once, and cleans up; no
+      load-order assumptions.
+- [ ] Player-injecting plugins work in both `v2` and `v3` (mount into the Host slot).
 
 **Capabilities & shipping:**
 

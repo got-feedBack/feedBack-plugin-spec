@@ -75,6 +75,13 @@ for how the document, manifest, and per-plugin versions relate.
   servable) referenced by **absolute `/api/plugins/<id>/…` URLs** (relative resolves against the
   document, not the script); and **idempotent** runtime loading so re-hydration doesn't double-load.
   Added a matching checklist block. Docs only.
+- Best-practices guide: added an **"Integrating with the app"** section, ground-truthed against the
+  `window.feedBack` runtime surface. Adds the **event-bus catalog** (`screen:changed`, `song:*`,
+  `library:changed`, `viz:*`, `highway:*` with their `event.detail` payloads), the rule to **drive
+  the app through the `feedBack` API** (`navigate`/`getNavParams`/`playSong`/`seek`/`setLoop`/
+  `currentSong`/`playQueue`) **rather than its DOM controls**, **wrapper discipline** for hooking
+  Host globals (call and `await` the original, install once, clean up, no load-order assumptions),
+  and the **v2/v3 player-chrome** mount contract. Added a matching checklist block. Docs only.
 
 ## [0.1.0] - 2026-07-05
 
