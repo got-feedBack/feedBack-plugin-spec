@@ -257,14 +257,17 @@ For each ready plugin that declares a `screen`, the Host:
 There is **no Host-invoked entry point**: the Host does not call a `mount()`, `init()`, or
 `render()` export. A plugin's `script` is a self-executing module that runs on load, wires up its
 own behaviour, and finds its own DOM by the identifiers the plugin authored inside its `screen`
-markup. A plugin therefore SHOULD own and namespace those identifiers (see
-[§6.4](#64-performance-and-the-shared-main-thread)).
+markup. A plugin therefore SHOULD namespace those identifiers under its `id` so they don't collide
+with the Host's or another plugin's — every plugin shares one document.
 
 **Re-hydration (normative).** The Host MAY execute a plugin's `script` more than once in a session
 — for example when the plugin set reloads. A plugin's `script` **MUST** be idempotent: a second
 (or later) execution MUST NOT install a second copy of any listener, timer, observer, DOM subtree,
-capability participant, or wrapped Host function. The established pattern is a stable singleton
-guard on a well-known global that the second run detects and returns early from. A plugin that
+capability participant, or wrapped Host function. The established pattern is a guard on a
+well-known global: a second run refreshes its implementation but installs shared listeners, timers,
+and wrappers only once. This suppresses duplicate **global** side effects from re-execution; it is
+distinct from **per-screen-instance** state, which [§6.4](#64-performance-and-the-shared-main-thread)
+says to keep per instance (the Host may mount several instances of a screen at once). A plugin that
 declares the `plugin-runtime-idempotent.v1` standard (see [§8](#8-capabilities-and-standards))
 asserts exactly this property and MUST honour it.
 
@@ -326,12 +329,13 @@ does not have. Accordingly:
   or the navigation bar) directly, and MUST NOT install a subtree `MutationObserver` on a shared
   container. To contribute UI to a shared surface, a plugin SHOULD use the Host's contribution
   registries ([§6.3](#63-the-client-runtime-surface)).
-- A plugin **SHOULD NOT** perform synchronous storage or blocking/network I/O on a per-frame path
-  or in a handler for a high-frequency or gameplay event.
+- A plugin **SHOULD NOT** perform synchronous storage (e.g. `localStorage`), blocking I/O, or
+  network I/O on a per-frame path or in a handler for a high-frequency or gameplay event.
 - A plugin **SHOULD** suspend animation loops and high-frequency subscriptions while its screen is
   not active ([§6.2](#62-screen-activation-and-visibility)), and **SHOULD** keep screen state
-  per-instance rather than in module-level globals, because the Host MAY display more than one
-  screen at once.
+  per-instance rather than in module-level globals, because the Host MAY mount more than one
+  instance of a screen at once (e.g. splitscreen), even though only one screen is *active* at a time
+  ([§6.2](#62-screen-activation-and-visibility)).
 
 These rules are portable and stable regardless of how the Host's runtime API evolves. The
 non-normative [best-practices guide](best-practices.md) expands on them with examples.
