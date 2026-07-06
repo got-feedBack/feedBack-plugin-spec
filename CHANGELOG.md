@@ -17,6 +17,16 @@ for how the document, manifest, and per-plugin versions relate.
   `events`), plus `kind` and `description`. The `compatibility` field is no longer a hard schema
   enum (its values are an open set); the observed values are documented instead. Purely additive
   and clarifying — every existing manifest still validates.
+- §6 (Client surface) rewritten to document the client screen contract, ground-truthed against the
+  Host. Adds the **mount lifecycle** (§6.1 — Host-created container, `screen`-sourced markup,
+  self-executing `script` with **no Host-invoked entry point**, and a normative **idempotent
+  re-hydration MUST**), **screen activation/visibility** (§6.2), and a description of the
+  **Host-provided, Host-versioned runtime surface** (§6.3 — event bus, contribution registries, and
+  the forward-stable capability control plane; raw window globals documented as supported-but-legacy).
+  New **§6.4 "Performance and the shared main thread"** makes the hot-path rules normative
+  (SHOULD NOT do per-frame DOM/layout/IO; don't observe/mutate the shell — use contribution
+  registries; suspend work when hidden; keep state per-instance). Replaces the previous "client
+  runtime API is out of scope" placeholder. Settings/Styles/Static-assets renumbered to §6.5–6.7.
 
 ## [0.1.0] - 2026-07-05
 

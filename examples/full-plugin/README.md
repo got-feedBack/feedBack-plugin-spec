@@ -19,5 +19,7 @@ python tools/validate.py examples/full-plugin
 ```
 
 Target Host: written against the plugin runtime documented for feedBack as of spec v0.1.0. The
-client runtime API (how `screen.js` mounts) is Host-provided and not yet pinned by the spec — see
-[§6.1](../../spec/plugin-spec-v1.md#61-screen).
+mount lifecycle is described in [§6.1](../../spec/plugin-spec-v1.md#61-screen-mount-lifecycle) and
+the Host-provided (and Host-versioned) runtime surface in
+[§6.3](../../spec/plugin-spec-v1.md#63-the-client-runtime-surface); the portable performance rules
+are normative in [§6.4](../../spec/plugin-spec-v1.md#64-performance-and-the-shared-main-thread).
