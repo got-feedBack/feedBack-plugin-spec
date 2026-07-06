@@ -81,6 +81,20 @@ def test_bad_id_pattern_fails_schema(tmp_path, validator):
     assert any("schema" in e for e in errors)
 
 
+def test_absolute_referenced_path_rejected(tmp_path, validator):
+    plugin_dir = _write_plugin(tmp_path, "p", {"id": "p", "script": "/etc/passwd"})
+    errors = validate.validate_plugin(plugin_dir, validator)
+    assert any("must be relative" in e for e in errors)
+
+
+def test_traversal_referenced_path_rejected(tmp_path, validator):
+    # A file that exists just outside the plugin dir must not satisfy the reference.
+    (tmp_path / "secret.txt").write_text("", encoding="utf-8")
+    plugin_dir = _write_plugin(tmp_path, "p", {"id": "p", "script": "../secret.txt"})
+    errors = validate.validate_plugin(plugin_dir, validator)
+    assert any("escapes the plugin directory" in e for e in errors)
+
+
 def test_invalid_json(tmp_path, validator):
     plugin_dir = tmp_path / "p"
     plugin_dir.mkdir()

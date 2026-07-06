@@ -35,9 +35,21 @@ SCHEMA_PATH = ROOT / "schemas" / "plugin.schema.json"
 _FILE_PATH_KEYS = ("script", "screen", "styles", "routes", "tour")
 
 
+class SchemaError(Exception):
+    """The manifest schema itself is missing, unreadable, or invalid."""
+
+
 def _load_schema() -> Draft202012Validator:
-    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    Draft202012Validator.check_schema(schema)
+    try:
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise SchemaError(f"cannot read schema {SCHEMA_PATH}: {exc}") from exc
+    except ValueError as exc:
+        raise SchemaError(f"schema {SCHEMA_PATH} is not valid JSON: {exc}") from exc
+    try:
+        Draft202012Validator.check_schema(schema)
+    except Exception as exc:  # jsonschema.SchemaError and friends
+        raise SchemaError(f"schema {SCHEMA_PATH} is not a valid JSON Schema: {exc}") from exc
     return Draft202012Validator(schema)
 
 
@@ -62,6 +74,8 @@ def validate_plugin(plugin_dir: Path, validator: Draft202012Validator) -> list[s
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except ValueError as exc:
         return [f"plugin.json is not valid JSON: {exc}"]
+    except OSError as exc:
+        return [f"cannot read plugin.json: {exc}"]
 
     if not isinstance(manifest, dict):
         return ["plugin.json must contain a JSON object"]
@@ -79,9 +93,26 @@ def validate_plugin(plugin_dir: Path, validator: Draft202012Validator) -> list[s
             f"(spec §5.2)"
         )
 
-    # 4. Every referenced file exists.
+    # 4. Every referenced file exists AND stays inside the plugin directory.
+    #    The spec (§4.3) defines these as paths relative to the plugin directory; an
+    #    absolute path or a `..` that climbs out (including via a symlink) escapes the
+    #    plugin and is rejected rather than resolved.
+    try:
+        base = plugin_dir.resolve(strict=False)
+    except OSError as exc:
+        return errors + [f"cannot resolve plugin directory: {exc}"]
     for rel in _referenced_files(manifest):
-        if not (plugin_dir / rel).is_file():
+        # Treat POSIX- and Windows-rooted paths as absolute regardless of the host OS,
+        # so `/etc/passwd` is rejected the same way on Linux and Windows (where
+        # Path.is_absolute() is False for a driveless root).
+        if Path(rel).is_absolute() or rel.startswith(("/", "\\")):
+            errors.append(f"referenced path must be relative, not absolute: {rel}")
+            continue
+        target = (plugin_dir / rel).resolve(strict=False)
+        if base != target and base not in target.parents:
+            errors.append(f"referenced path escapes the plugin directory: {rel}")
+            continue
+        if not target.is_file():
             errors.append(f"referenced file not found: {rel}")
 
     return errors
@@ -92,7 +123,11 @@ def main(argv: list[str]) -> int:
         print("usage: validate.py PLUGIN_DIR [PLUGIN_DIR ...]", file=sys.stderr)
         return 2
 
-    validator = _load_schema()
+    try:
+        validator = _load_schema()
+    except SchemaError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     ok = True
     for arg in argv[1:]:
         plugin_dir = Path(arg)
