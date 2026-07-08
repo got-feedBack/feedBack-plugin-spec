@@ -9,6 +9,23 @@ for how the document, manifest, and per-plugin versions relate.
 
 ## [Unreleased]
 
+### Added
+- **Module `script` entries.** §3 (Anatomy), §4.1/§4.3, new §6.8 (Splitting client code), and
+  `schemas/plugin.schema.json` document the optional **`scriptType`** manifest key: `"module"` loads
+  a plugin's `script` as an ES module (`<script type="module">`), letting the entry use top-level
+  `import` / `export` and `import.meta` and split its client code across a served **`src/`** module
+  tree; absent or `"classic"` is the unchanged classic-script behaviour. The optional **`minHost`**
+  key (minimum Host version) is documented alongside it. Purely additive — every existing manifest
+  still validates, and a Host that ignores `scriptType` keeps loading `script` as a classic script.
+
+### Changed
+- Best-practices "Organizing client code across files" (rules 27–29) rewritten around the new
+  paradigm: an ES-module entry (`scriptType: "module"` + a `src/` tree with real `import`/`export`)
+  is now the recommended way to split client code, with the classic single-`screen.js` bundle /
+  `window`-shared runtime split kept as the fallback for older Hosts. Corrects the prior text, which
+  stated `screen.js` is *always* a classic script and that only `assets/` is servable — both no
+  longer true once `scriptType: "module"` is set.
+
 ## [1.0.0] - 2026-07-06
 
 First stable release of the feedBack plugin specification. Marks the normative spec and its

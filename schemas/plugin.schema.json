@@ -31,7 +31,15 @@
     },
     "script": {
       "type": "string",
-      "description": "Client JS module, path relative to the plugin directory."
+      "description": "Client JS entry, path relative to the plugin directory."
+    },
+    "scriptType": {
+      "type": "string",
+      "description": "How the Host loads `script`. \"module\" loads it as an ES module (<script type=\"module\">), enabling top-level import/export, import.meta, and a src/ module tree; absent or \"classic\" loads it as a classic script. Not enumerated as a hard constraint — any unrecognised value is treated as classic. See spec §4.3 and §6.8."
+    },
+    "minHost": {
+      "type": "string",
+      "description": "Minimum Host (core) version the plugin requires, semver RECOMMENDED. Advisory in the current Host (surfaced, not yet enforced). See spec §4.3."
     },
     "screen": {
       "type": "string",

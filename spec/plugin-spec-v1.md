@@ -65,7 +65,9 @@ A plugin is a directory whose name equals its `id`:
 ```text
 tuner/                     # directory name == manifest "id"
 ├── plugin.json            # REQUIRED — the manifest
-├── screen.js              # client script (manifest "script")
+├── screen.js              # client script entry (manifest "script")
+├── src/                   # OPTIONAL — an ES-module tree the entry imports (see §6.8)
+│   └── main.js
 ├── settings.html          # settings panel markup (manifest "settings.html")
 ├── routes.py              # server routes (manifest "routes")
 ├── assets/
@@ -76,6 +78,11 @@ tuner/                     # directory name == manifest "id"
 Only `plugin.json` is REQUIRED. Every other file exists **because the manifest points at it**;
 a file present but not referenced from the manifest is ignored by the Host (though it MAY still
 be served as a static asset — see [§6.7](#67-static-assets)).
+
+The `script` entry MAY be a single self-contained file, or — when the manifest sets
+`"scriptType": "module"` (see [§4.3](#43-client-surface-keys--script-screen-styles)) — a small ES
+module that imports the plugin's client code from a **`src/` module tree**. The Host serves that
+tree so the entry's relative imports resolve; see [§6.8](#68-splitting-client-code-across-modules).
 
 File and directory names inside a plugin SHOULD be lowercase with `-` or `_` separators. The
 directory name (the `id`) MUST match `^[a-z0-9][a-z0-9_-]*$` (see [§4.2](#42-id)).
@@ -100,7 +107,9 @@ The machine-readable schema is [`schemas/plugin.schema.json`](../schemas/plugin.
 | `version` | string | No | Plugin version (semver RECOMMENDED). |
 | `description` | string | No | One-line description for listings. |
 | `type` | string | No | Plugin kind, e.g. `"visualization"`. |
-| `script` | string | No | Client JS module, relative path (e.g. `screen.js`). |
+| `script` | string | No | Client JS entry, relative path (e.g. `screen.js`). |
+| `scriptType` | string | No | How the Host loads `script`: `"module"` loads it as an ES module; absent or `"classic"` loads it as a classic script (see [§4.3](#43-client-surface-keys--script-screen-styles)). |
+| `minHost` | string | No | Minimum Host (core) version the plugin requires (semver). Advisory in the current Host. |
 | `screen` | string | No | Client screen markup, relative path (e.g. `screen.html`). |
 | `styles` | string | No | CSS file, relative path (e.g. `assets/plugin.css`). |
 | `settings` | object | No | Settings-panel declaration (see [§4.4](#44-settings)). |
@@ -145,6 +154,20 @@ plugin directory. See [§6](#6-client-surface) for how they are served.
 
 A plugin with none of these contributes no client screen (it may still contribute `routes`,
 `settings`, or `capabilities`).
+
+**Classic vs. module `script` (`scriptType`).** By default the Host loads `script` as a *classic*
+browser script that runs in the global scope. When the manifest sets `"scriptType": "module"`, the
+Host loads `script` as an ES module (`<script type="module">`) instead. A module entry MAY use
+top-level `import` / `export` and `import.meta`, and MAY split the plugin's client code across a
+tree of sibling modules it imports — conventionally under `src/`, with a one-line
+`screen.js` of `import './src/main.js';`. The Host serves that tree so those imports resolve; see
+[§6.8](#68-splitting-client-code-across-modules). A classic entry cannot use top-level `import` /
+`export` and shares state across split files through `window` instead.
+
+`scriptType` is additive: an older Host that does not recognise it loads `script` as a classic
+script (where a module entry's top-level `import` fails). A plugin that requires module loading
+therefore SHOULD declare the minimum Host version it needs via `minHost`, so a Host too old to load
+it as a module can surface that rather than silently loading a broken screen.
 
 ### 4.4. `settings`
 
@@ -252,10 +275,13 @@ For each ready plugin that declares a `screen`, the Host:
 1. creates a container element it owns — currently a `<div class="screen">` with a deterministic,
    `id`-derived identifier (of the form `plugin-<id>`) — and inserts it into the app shell;
 2. sets that container's markup from the plugin's `screen` file;
-3. loads the plugin's `script` and executes it once.
+3. loads the plugin's `script` — as a classic script, or as an ES module when the manifest sets
+   `scriptType: "module"` ([§4.3](#43-client-surface-keys--script-screen-styles)) — and executes it
+   once.
 
-There is **no Host-invoked entry point**: the Host does not call a `mount()`, `init()`, or
-`render()` export. A plugin's `script` is a self-executing module that runs on load, wires up its
+There is **no Host-invoked entry point** in either case: the Host does not call a `mount()`,
+`init()`, or `render()` export. A plugin's `script` is a self-executing unit that runs on load
+(a module entry runs once its static-import graph has evaluated), wires up its
 own behaviour, and finds its own DOM by the identifiers the plugin authored inside its `screen`
 markup. A plugin therefore SHOULD namespace those identifiers under its `id` so they don't collide
 with the Host's or another plugin's — every plugin shares one document.
@@ -356,6 +382,28 @@ CSS SHOULD be scoped to the plugin's own DOM to avoid leaking styles into the re
 The Host MAY serve files inside a plugin directory as static assets (images, audio, fonts). A
 plugin MUST NOT rely on any file *outside* its own directory being served, and MUST NOT assume a
 particular absolute URL — asset URLs are Host-assigned relative to the plugin.
+
+### 6.8. Splitting client code across modules
+
+A plugin whose `script` declares `"scriptType": "module"` ([§4.3](#43-client-surface-keys--script-screen-styles))
+MAY split its client code across several ES modules instead of shipping one file. The established
+layout is a one-line entry (`screen.js` → `import './src/main.js';`) over a **`src/` tree** of
+modules that `import` / `export` from one another.
+
+For those imports to resolve in the browser, the Host serves the `src/` tree in addition to
+`assets/` ([§6.7](#67-static-assets)): the entry's relative `import './src/…'` and any imports
+between `src/` modules are fetched from the plugin, path-traversal-guarded the same way assets are.
+A module resolves its own non-JS assets (worklets, wasm, CSS) against its module URL — e.g.
+`new URL('../assets/worklet.js', import.meta.url)` — rather than a hardcoded absolute path.
+
+This is a Host capability, not a bundler: the Host serves the module files verbatim and the browser
+resolves the graph. The **exact URL layout** by which `src/` is served is Host-provided and versioned
+by the Host (like the rest of [§6.3](#63-the-client-runtime-surface)); what this specification pins is
+that a module entry's own-directory relative imports are served, and that the re-hydration idempotence
+requirement of [§6.1](#61-screen-mount-lifecycle) applies to a module entry exactly as to a classic one.
+
+A plugin that does not set `scriptType: "module"` keeps the classic single-`script` contract; serving
+of a `src/` tree is meaningful only for a module entry.
 
 ---
 
