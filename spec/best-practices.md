@@ -419,7 +419,7 @@ tree — the Host then loads `screen.js` as `<script type="module">`, so real `i
 import './src/main.js';
 ```
 
-```
+```text
 my-plugin/
 ├── screen.js          # one-line module entry
 ├── src/               # served by the Host; imports resolve here
@@ -453,14 +453,19 @@ script**: no top-level `import` / `export`, no `import.meta`. Two options:
   concern below. (feedBack ships no bundler and serves plugin JS verbatim — this is your own build
   step, the simplest path to a non-monolithic classic plugin.)
 - **Split at runtime.** Put split-out `.js` (and any `.css`, workers, `.wasm`) under **`assets/`**,
-  which the Host serves path-traversal-guarded with the correct MIME type, and reference them by an
-  **absolute** `/api/plugins/<id>/assets/…` URL — a relative `import('./part.js')` from a classic
-  script resolves against the app root, not your script, and silently 404s. Classic split files share
-  state through **`window`**, namespaced under your `id` with **bracket notation** (an `id` may
-  contain `-`): `(window.__feedBackPlugins ||= {})['my-plugin']`, never `window.my-plugin`.
+  which the Host serves path-traversal-guarded with the correct MIME type. Reference them by an
+  **absolute** URL (a relative `import('./part.js')` from a classic script resolves against the app
+  root, not your script, and silently 404s) — but **derive that URL from your own script's served URL
+  rather than hardcoding a route**: asset URLs are Host-assigned (spec §6.7), so build the base once
+  from `document.currentScript` at top level. Classic split files share state through **`window`**,
+  namespaced under your `id` with **bracket notation** (an `id` may contain `-`):
+  `(window.__feedBackPlugins ||= {})['my-plugin']`, never `window.my-plugin`.
 
 ```js
-const ASSET_BASE = '/api/plugins/my-plugin/assets/';   // hardcode your id
+// Derive the asset base from this script's own served URL — don't hardcode the route
+// (asset URLs are Host-assigned, spec §6.7). Capture it at top level, while
+// document.currentScript is still your screen.js.
+const ASSET_BASE = new URL('assets/', document.currentScript.src).href;
 import(ASSET_BASE + 'lib/util.js').then(util => { /* ES module served from assets/ */ });
 loadScriptOnce(ASSET_BASE + 'lib/legacy.js');          // classic, window-attaching helper (rule 29)
 ```
@@ -949,7 +954,8 @@ note changes per version. It costs little and saves every future reader — incl
       modules live under `src/` and share state via `import`/`export`, assets resolve via
       `import.meta.url`, and `minHost` is declared.
 - [ ] Classic mode (no `scriptType`): extra JS lives under `assets/` (or a `routes.py`-served dir),
-      referenced by absolute `/api/plugins/<id>/…` URLs, and split files share state via a
+      referenced by an absolute URL derived from the Host-served base (§6.7 — e.g. from
+      `document.currentScript`), not a hardcoded route, and split files share state via a
       bracket-keyed `window["<id>"]` namespace (no `import`/`export` or top-level `await`).
 - [ ] Split pieces load exactly once, so re-hydration doesn't load them twice (classic runtime
       splits need an explicit `window`-kept de-dupe cache; a module graph dedupes itself).
