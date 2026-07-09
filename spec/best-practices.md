@@ -399,60 +399,85 @@ abandonment/cleanup for that hop.
 
 ## Organizing client code across files
 
-A plugin declares a single `script` (`screen.js`), but that doesn't force you into one giant file.
-You can split your client code — you just have to work within how the Host loads and serves it.
-The mechanics below are the current Host contract.
+A plugin declares a single `script` entry (`screen.js`), but that doesn't force you into one giant
+file. You can split your client code two ways, depending on how the Host loads your entry: as an **ES
+module** (recommended, `scriptType: "module"`) or as a **classic script** (the default, and the only
+option on older Hosts). The mechanics below are the current Host contract.
 
-### 27. Prefer bundling to one `screen.js`; split at runtime only when you must
+### 27. Split with an ES-module entry (`scriptType: "module"`)
 
-If you have any build tooling, author your plugin as many source files and **bundle them into the
-one `screen.js` you ship**. The Host loads exactly one script, so a bundle sidesteps every gotcha in
-the next two rules — no extra routes, no load-order or idempotency concerns. (feedBack ships no
-bundler and serves plugin JS verbatim, so this is your own build step, not a Host feature — but it's
-the simplest path to a non-monolithic plugin.)
+Set `"scriptType": "module"` in `plugin.json` and make your entry a one-line re-export of a `src/`
+tree — the Host then loads `screen.js` as `<script type="module">`, so real `import` / `export` work:
 
-If you split at runtime instead, know the constraint that shapes everything else: **`screen.js` runs
-as a *classic* script, not an ES module.** Top-level `import` / `export` and `import.meta` do not
-work in it. Split files therefore share state through **`window`** (namespaced under your `id`, per
-rule 2), not through ES exports — each file attaches what it provides to a per-plugin object and
-reads its dependencies from there. Key that object by `id` with **bracket notation**, since an `id`
-may contain `-` (which isn't a valid JS identifier): `window['my-plugin']` or a shared
-`(window.__feedBackPlugins ||= {})['my-plugin']` — not `window.my-plugin`, which is a syntax error.
-
-### 28. Serve extra files from `assets/`, and reference them by absolute URL
-
-The plugin **root is not a servable directory** — only `screen.js`, `screen.html`, `settings.html`,
-`tour.json`, and everything under **`assets/`** are served. A helper at your plugin root
-(`/api/plugins/<id>/lib/util.js`) returns 404; the same file under `assets/`
-(`/api/plugins/<id>/assets/lib/util.js`) is served by the Host, path-traversal-guarded and with the
-correct JavaScript MIME type. So put your split-out `.js` (and any `.css`, workers, or `.wasm`)
-under `assets/`. (If you genuinely need a non-`assets/` layout, a `routes.py` can serve your own
-sibling directories — but `assets/` is the built-in path and needs no server code.)
-
-Reference these files by an **absolute** `/api/plugins/<id>/assets/…` URL, never a relative one.
-Because `screen.js` is a classic script, a relative `import('./part.js')` resolves against the
-document's base URL (the app root), not your script — so it silently hits the wrong path. Build a
-base constant once and use it everywhere:
-
-```js
-const ASSET_BASE = '/api/plugins/my-plugin/assets/';   // hardcode your id
-// screen.js is a classic script, so there's no top-level await — use .then (or an async IIFE):
-import(ASSET_BASE + 'lib/util.js').then(util => { /* ES module served from assets/ */ });
-// or a classic, window-attaching helper:
-loadScriptOnce(ASSET_BASE + 'lib/legacy.js');          // see rule 29
+```jsonc
+// plugin.json
+{ "id": "my-plugin", "script": "screen.js", "scriptType": "module", "minHost": "0.3.0-alpha.1" }
 ```
 
-Dynamic `import()` of a real ES module works this way (the module can use `import`/`export` among
-*its own* files, addressed by absolute URL); classic `<script>` injection works for non-module
-helpers that attach to `window`.
+```js
+// screen.js — the entire entry
+import './src/main.js';
+```
 
-### 29. Load each split file exactly once
+```text
+my-plugin/
+├── screen.js          # one-line module entry
+├── src/               # served by the Host; imports resolve here
+│   ├── main.js        # import { x } from './util.js';
+│   └── util.js        # export function x() { … }
+└── assets/            # worklets, wasm, css, images
+```
 
-The Host may re-run your `screen.js` mid-session (rule 12), and your own screen may re-mount — so any
-runtime loading must be **idempotent**. De-dupe it, but keep the cache **on `window`** (a module-local
-`Set` is wiped when `screen.js` re-runs, so it wouldn't actually prevent a re-load), cache the
-**in-flight promise** so concurrent callers share one load, and **drop the entry on failure** so a
-transient error can be retried:
+The Host serves the `src/` tree (alongside `assets/`), so **relative** imports between your modules
+resolve naturally — no hardcoded `/api/plugins/<id>/…` URLs. Modules share state through ES exports,
+not `window`. Resolve non-JS assets against the module URL rather than a hardcoded base:
+
+```js
+// src/audio.js — loads a worklet that lives in ../assets/
+const url = new URL('../assets/worklet.js', import.meta.url).href;
+await audioCtx.audioWorklet.addModule(url);
+```
+
+Declare **`minHost`** (the minimum core version you need): an older Host ignores `scriptType` and
+loads your entry as a classic script, where top-level `import` throws — `minHost` lets the Host
+surface that instead of silently mounting a broken screen. Re-hydration idempotence (rule 12) still
+applies: guard your global side effects, since the Host may re-mount your screen.
+
+### 28. On an older Host: bundle to one classic `screen.js`, or split via `window`
+
+Without `scriptType: "module"` — or on a Host too old to honour it — `screen.js` runs as a **classic
+script**: no top-level `import` / `export`, no `import.meta`. Two options:
+
+- **Bundle.** If you have build tooling, author many source files and bundle them into the one
+  `screen.js` you ship. The Host loads exactly one script, so a bundle sidesteps every runtime-split
+  concern below. (feedBack ships no bundler and serves plugin JS verbatim — this is your own build
+  step, the simplest path to a non-monolithic classic plugin.)
+- **Split at runtime.** Put split-out `.js` (and any `.css`, workers, `.wasm`) under **`assets/`**,
+  which the Host serves path-traversal-guarded with the correct MIME type. Reference them by an
+  **absolute** URL (a relative `import('./part.js')` from a classic script resolves against the app
+  root, not your script, and silently 404s) — but **derive that URL from your own script's served URL
+  rather than hardcoding a route**: asset URLs are Host-assigned (spec §6.7), so build the base once
+  from `document.currentScript` at top level. Classic split files share state through **`window`**,
+  namespaced under your `id` with **bracket notation** (an `id` may contain `-`):
+  `(window.__feedBackPlugins ||= {})['my-plugin']`, never `window.my-plugin`.
+
+```js
+// Derive the asset base from this script's own served URL — don't hardcode the route
+// (asset URLs are Host-assigned, spec §6.7). Capture it at top level, while
+// document.currentScript is still your screen.js.
+const ASSET_BASE = new URL('assets/', document.currentScript.src).href;
+import(ASSET_BASE + 'lib/util.js').then(util => { /* ES module served from assets/ */ });
+loadScriptOnce(ASSET_BASE + 'lib/legacy.js');          // classic, window-attaching helper (rule 29)
+```
+
+### 29. Load each classic split file exactly once
+
+When you split a **classic** entry at runtime (rule 28), the Host may re-run `screen.js` mid-session
+(rule 12) and your screen may re-mount — so runtime loading must be **idempotent**. (A module entry
+needs none of this: the browser evaluates each statically-imported module once and dedupes it for
+you.) De-dupe with a cache kept **on `window`** (a module-local `Set` is wiped when `screen.js`
+re-runs), cache the **in-flight promise** so concurrent callers share one load, and **drop the entry
+on failure** so a transient error can be retried:
 
 ```js
 const _loading = (window.__myPluginScripts ||= new Map());   // survives screen.js re-run
@@ -925,11 +950,15 @@ note changes per version. It costs little and saves every future reader — incl
 
 **Split client code (if `screen.js` isn't a single bundle):**
 
-- [ ] Extra JS lives under `assets/` (or a `routes.py`-served dir), not the plugin root, and is
-      referenced by absolute `/api/plugins/<id>/…` URLs.
-- [ ] Split files share state via a bracket-keyed `window["<id>"]` namespace (classic script — no
-      `import`/`export` or top-level `await` in `screen.js`).
-- [ ] Runtime loads are de-duped so re-hydration doesn't load them twice.
+- [ ] Module mode (`scriptType: "module"`): `screen.js` is a one-line `import './src/main.js';`,
+      modules live under `src/` and share state via `import`/`export`, assets resolve via
+      `import.meta.url`, and `minHost` is declared.
+- [ ] Classic mode (no `scriptType`): extra JS lives under `assets/` (or a `routes.py`-served dir),
+      referenced by an absolute URL derived from the Host-served base (§6.7 — e.g. from
+      `document.currentScript`), not a hardcoded route, and split files share state via a
+      bracket-keyed `window["<id>"]` namespace (no `import`/`export` or top-level `await`).
+- [ ] Split pieces load exactly once, so re-hydration doesn't load them twice (classic runtime
+      splits need an explicit `window`-kept de-dupe cache; a module graph dedupes itself).
 
 **Integrating with the app:**
 
