@@ -1,0 +1,6 @@
+# Default owners for everything in this repo. Review from a code owner is
+# required to merge into main (enforced via branch protection).
+#
+# The plugin spec is a published contract — plugin authors build against it —
+# so changes go through the maintainers listed here.
+*   @topkoa @byrongamatos
