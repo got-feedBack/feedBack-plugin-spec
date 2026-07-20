@@ -54,6 +54,16 @@ The validator is also a minimal reference implementation of the discovery contra
 checks `plugin.json`, enforces that the directory name equals the `id`, and confirms every file
 the manifest references exists.
 
+Plugin repositories can run the same gate in their own CI via the reusable workflow
+[`plugin-validate.yml`](.github/workflows/plugin-validate.yml), keeping the schema and
+validation logic single-sourced here:
+
+```yaml
+jobs:
+  validate:
+    uses: got-feedback/feedBack-plugin-spec/.github/workflows/plugin-validate.yml@main
+```
+
 ## Versioning
 
 Three version axes are kept separate (see [spec §9](spec/plugin-spec-v1.md#9-versioning-and-compatibility)):

@@ -1,0 +1,71 @@
+# Reusable validation workflow for feedBack plugin repositories.
+#
+# Call it from a plugin repo's CI in three lines:
+#
+#   jobs:
+#     validate:
+#       uses: got-feedback/feedBack-plugin-spec/.github/workflows/plugin-validate.yml@main
+#
+# It runs tools/validate.py — the same gate this repo runs on its own
+# examples — against the caller's plugin, so validation logic and the
+# manifest schema stay single-sourced here instead of being vendored
+# (and drifting) in every plugin repo.
+#
+# The plugin is first staged under a directory named after its manifest
+# `id`, so a repository can be named e.g. `feedBack-plugin-foo` while the
+# plugin id is `foo`: spec §5.2 (directory name == id) is enforced against
+# the staged copy, matching how the plugin actually sits inside a Host's
+# plugins/ directory after installation.
+
+name: plugin-validate
+
+on:
+  workflow_call:
+    inputs:
+      plugin-dir:
+        description: "Path to the plugin directory inside the caller repository."
+        type: string
+        required: false
+        default: "."
+      spec-ref:
+        description: "Ref of this spec repository to validate against."
+        type: string
+        required: false
+        default: "main"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: caller
+
+      - name: Check out spec
+        uses: actions/checkout@v4
+        with:
+          repository: got-feedback/feedBack-plugin-spec
+          ref: ${{ inputs.spec-ref }}
+          path: spec
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade jsonschema
+
+      - name: Stage plugin under its manifest id (spec §5.2)
+        run: |
+          set -eu
+          SRC="caller/${{ inputs.plugin-dir }}"
+          ID="$(python -c "import json, sys; print(json.load(open(sys.argv[1]))['id'])" "$SRC/plugin.json")"
+          mkdir -p "staged/$ID"
+          cp -R "$SRC/." "staged/$ID/"
+          rm -rf "staged/$ID/.git"
+          echo "STAGED=staged/$ID" >> "$GITHUB_ENV"
+
+      - name: Validate against the spec
+        run: python spec/tools/validate.py "$STAGED"
