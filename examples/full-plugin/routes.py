@@ -35,11 +35,11 @@ def setup(app: FastAPI, context: dict) -> None:
             return dict(_DEFAULTS)
 
     # Everything below only runs after the plugin has validated its own state.
-    @app.get(f"/api/plugin/{PLUGIN_ID}/settings")
+    @app.get(f"/api/plugins/{PLUGIN_ID}/settings")
     def get_settings() -> JSONResponse:
         return JSONResponse(_read())
 
-    @app.post(f"/api/plugin/{PLUGIN_ID}/settings")
+    @app.post(f"/api/plugins/{PLUGIN_ID}/settings")
     async def set_settings(request: Request) -> JSONResponse:
         incoming = await request.json()
         if not isinstance(incoming, dict):

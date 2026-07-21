@@ -3,7 +3,7 @@
 // The exact runtime API the Host exposes to a plugin screen is Host-provided and
 // out of scope for spec v0.1.0 (see spec §6.1). This file shows the *shape* of a
 // screen module: it renders into its own root element and talks only to its own
-// namespaced routes (/api/plugin/full-plugin/...). Keep all DOM and CSS scoped to
+// namespaced routes (/api/plugins/full-plugin/...). Keep all DOM and CSS scoped to
 // the plugin's root so nothing leaks into the rest of the app.
 
 const PLUGIN_ID = "full-plugin";
@@ -17,7 +17,7 @@ export async function mount(root) {
   `;
 
   try {
-    const res = await fetch(`/api/plugin/${PLUGIN_ID}/settings`);
+    const res = await fetch(`/api/plugins/${PLUGIN_ID}/settings`);
     const settings = await res.json();
     root.querySelector('[data-role="color"]').textContent = settings.color;
   } catch (err) {

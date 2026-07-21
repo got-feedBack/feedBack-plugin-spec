@@ -9,6 +9,16 @@ for how the document, manifest, and per-plugin versions relate.
 
 ## [Unreleased]
 
+### Fixed
+- **Route-prefix examples now match the Host.** Every illustrative route prefix said
+  `/api/plugin/<id>/…` (singular) in §7.3, twice in `best-practices.md`, and throughout
+  `examples/full-plugin` (`routes.py`, `screen.js`, `settings.html`), while the feedBack Host
+  serves plugin routes under **`/api/plugins/…`** (plural) — and the rest of
+  `best-practices.md` already used the plural form. All examples and prose now use
+  `/api/plugins/<id>/…`. The normative rule (§7.4: derive every route path from the plugin
+  `id`) is unchanged — the singular form only ever appeared in examples, never as a
+  requirement. Closes [#20](https://github.com/got-feedBack/feedBack-plugin-spec/issues/20).
+
 ### Added
 - **Module `script` entries.** §3 (Anatomy), §4.1/§4.3, new §6.8 (Splitting client code), and
   `schemas/plugin.schema.json` document the optional **`scriptType`** manifest key: `"module"` loads
