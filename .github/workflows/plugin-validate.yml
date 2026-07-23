@@ -1,0 +1,86 @@
+# Reusable validation workflow for feedBack plugin repositories.
+#
+# Call it from a plugin repo's CI in three lines:
+#
+#   jobs:
+#     validate:
+#       uses: got-feedback/feedBack-plugin-spec/.github/workflows/plugin-validate.yml@main
+#
+# It runs tools/validate.py — the same gate this repo runs on its own
+# examples — against the caller's plugin, so validation logic and the
+# manifest schema stay single-sourced here instead of being vendored
+# (and drifting) in every plugin repo.
+#
+# The plugin is first staged under a directory named after its manifest
+# `id`, so a repository can be named e.g. `feedBack-plugin-foo` while the
+# plugin id is `foo`: spec §5.2 (directory name == id) is enforced against
+# the staged copy, matching how the plugin actually sits inside a Host's
+# plugins/ directory after installation.
+
+name: plugin-validate
+
+on:
+  workflow_call:
+    inputs:
+      plugin-dir:
+        description: "Path to the plugin directory inside the caller repository."
+        type: string
+        required: false
+        default: "."
+      spec-ref:
+        description: "Ref of this spec repository to validate against."
+        type: string
+        required: false
+        default: "main"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: caller
+          persist-credentials: false
+
+      - name: Check out spec
+        uses: actions/checkout@v4
+        with:
+          repository: got-feedback/feedBack-plugin-spec
+          ref: ${{ inputs.spec-ref }}
+          path: spec
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade jsonschema
+
+      - name: Stage plugin under its manifest id (spec §5.2)
+        env:
+          PLUGIN_DIR: ${{ inputs.plugin-dir }}
+        run: |
+          set -eu
+          SRC="caller/$PLUGIN_DIR"
+          # This step runs *before* validate.py, so the manifest is still
+          # untrusted here — the schema's id pattern (^[a-z0-9][a-z0-9_-]*$)
+          # has not been enforced yet. Strip any path components and fall back
+          # to a placeholder when plugin.json is missing, unreadable, or has no
+          # usable id, so a bad manifest yields validate.py's diagnostic rather
+          # than a shell traceback or a write outside staged/.
+          ID="$(python -c 'import json, os, sys
+          try: v = json.load(open(sys.argv[1])).get("id")
+          except Exception: v = None
+          v = os.path.basename(str(v or "").strip())
+          print(v if v not in ("", ".", "..") else "invalid-manifest")' "$SRC/plugin.json" 2>/dev/null || true)"
+          [ -n "$ID" ] || ID="invalid-manifest"
+          mkdir -p "staged/$ID"
+          cp -R "$SRC/." "staged/$ID/"
+          rm -rf "staged/$ID/.git"
+          echo "STAGED=staged/$ID" >> "$GITHUB_ENV"
+
+      - name: Validate against the spec
+        run: python spec/tools/validate.py "$STAGED"
