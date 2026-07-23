@@ -445,7 +445,7 @@ Because partially-registered routes cannot always be removed (see [§5.4](#54-pa
 a `setup` SHOULD:
 
 - validate its configuration and inputs *before* registering any route;
-- namespace its routes under a path derived from the plugin `id` (e.g. `/api/plugin/<id>/...`) to
+- namespace its routes under a path derived from the plugin `id` (e.g. `/api/plugins/<id>/...`) to
   avoid colliding with the Host or other plugins;
 - never raise after the first route is registered, if it can be avoided.
 

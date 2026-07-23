@@ -64,7 +64,7 @@ disabled), so a collision there is especially sticky.
 
 **Namespace what the `id` doesn't namespace for you.** Because every plugin shares one `window` and
 one document, prefix anything you put in a shared space with your `id`: `localStorage` keys, any
-`window` globals you must expose, your routes (`/api/plugin/<id>/…`, rule 7), and your CSS (rule 10).
+`window` globals you must expose, your routes (`/api/plugins/<id>/…`, rule 7), and your CSS (rule 10).
 Two plugins writing `window.state` or `localStorage["theme"]` clobber each other silently.
 
 ### 3. Keep the manifest declarative
@@ -107,7 +107,7 @@ mounts two routes and then throws leaves two half-working endpoints behind perma
 
 ### 7. Namespace everything under your `id`
 
-- Routes: `"/api/plugin/my-plugin/state"`, not `"/state"`.
+- Routes: `"/api/plugins/my-plugin/state"`, not `"/state"`.
 - CSS: scope selectors to your screen's root element, don't style bare `body`/`h1`.
 - Persisted files: write under the `config_dir` the Host hands you, in a file named for your
   plugin (`config_dir / "my_plugin.json"`).
